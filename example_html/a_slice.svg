@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" height="500" width="500" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet" id="Cadnano_Slice"  >
+<g id="VirtualHelices"  >
+<circle cx="155.88459" cy="67.5" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh7"  />
+<circle cx="136.39901625" cy="56.25" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh6"  />
+<circle cx="116.9134425" cy="67.5" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh5"  />
+<circle cx="97.42786875" cy="56.25" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh4"  />
+<circle cx="77.942295" cy="67.5" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh3"  />
+<circle cx="58.45672125" cy="56.25" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh2"  />
+<circle cx="58.45672125" cy="33.75" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh1"  />
+<circle cx="38.9711475" cy="22.5" r="11.25" style="fill:#f2ca9a; stroke:#cc6600; stroke-width:1;" id="circle_vh0"  />
+</g>
+<g id="VirtualHelixLabels" font-size="16" font-family="sans-serif" text-anchor="middle"  >
+<text x="155.88459" y="72.125" id="label_vh7"  >
+7</text>
+<text x="136.39901625" y="60.875" id="label_vh6"  >
+6</text>
+<text x="116.9134425" y="72.125" id="label_vh5"  >
+5</text>
+<text x="97.42786875" y="60.875" id="label_vh4"  >
+4</text>
+<text x="77.942295" y="72.125" id="label_vh3"  >
+3</text>
+<text x="58.45672125" y="60.875" id="label_vh2"  >
+2</text>
+<text x="58.45672125" y="38.375" id="label_vh1"  >
+1</text>
+<text x="38.9711475" y="27.125" id="label_vh0"  >
+0</text>
+</g>
+</svg>

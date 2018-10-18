@@ -8,7 +8,9 @@ cn2svg a rewrite of the SVG export tool found in the original cadnano ([Svg.as](
 
 ## Example Usage
 
-`cn2svg -i cadnanofile.json -oslice design_slice.svg -opath design_path.svg`
+`cn2svg -i cadnanofile.json -o outputdir`
+
+The output should include two separate files: `cadnanofile_slice.svg` and `cadnanofile_path.svg`.
 
 ## Dependencies
 

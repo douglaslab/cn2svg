@@ -33,7 +33,7 @@ class CadnanoDocument(object):
         self.part = part = doc.activePart()
         self.part_props = part_props = part.getModelProperties().copy()
         self.vh_order = part_props['virtual_helix_order']
-        self.vh_props, self.vh_origins, _ = part.helixProperties()
+        self.vh_props, self.vh_origins = part.helixPropertiesAndOrigins()
         self.vh_radius = part.radius()
         self.max_vhelix_length = max(self.vh_props['length'])
 
@@ -120,7 +120,7 @@ class CadnanoSliceSvg(object):
         g = G()
         g.setAttribute("id", "VirtualHelices")
         for id_num in self.cn_doc.vh_order[::-1]:
-            vh_x, vh_y, vh_z = self.cn_doc.vh_origins[id_num]
+            vh_x, vh_y = self.cn_doc.vh_origins[id_num]
             x = vh_x + self.cn_doc.x_offset
             y = -vh_y + self.cn_doc.y_offset
             c = Circle(x*_SLICE_SCALE, y*_SLICE_SCALE, vh_radius*_SLICE_SCALE)
@@ -144,7 +144,7 @@ class CadnanoSliceSvg(object):
         # g.setAttribute("font-family", "sans-serif")
         g.setAttribute("text-anchor", "middle")
         for id_num in self.cn_doc.vh_order[::-1]:
-            vh_x, vh_y, vh_z = self.cn_doc.vh_origins[id_num]
+            vh_x, vh_y = self.cn_doc.vh_origins[id_num]
             x = vh_x + self.cn_doc.x_offset
             y = -vh_y + self.cn_doc.y_offset + self.cn_doc.vh_radius/2.
             t = Text('%s' % id_num, x*_SLICE_SCALE, y*_SLICE_SCALE - 1)

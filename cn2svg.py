@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
-import sys
+import argparse
 from math import floor
+import os
+import sys
+from typing import Dict, List, Tuple
 
 from pysvg.shape import Circle, Path, Rect, Polygon  # Line, Polyline
 from pysvg.structure import G, Svg
@@ -10,7 +13,7 @@ from pysvg.text import Text
 import cadnano
 from cadnano.document import Document
 
-DESIGN_NAME = 'a'
+
 DEFAULT_SLICE_SCALE = 10
 DEFAULT_PATH_SCALE = 10
 
@@ -20,7 +23,7 @@ class CadnanoDocument(object):
     Opens and Parses a Cadnano file. Provides accessors for cadnano design
     parameters needed for SVG conversion.
     """
-    def __init__(self, cnjsonpath):
+    def __init__(self, cnjsonpath: str) -> None:
         super(CadnanoDocument, self).__init__()
         self.cnjsonpath = cnjsonpath
 
@@ -43,11 +46,11 @@ class CadnanoDocument(object):
         self.y_offset = self.slice_height/2
     # end def
 
-    def getSliceDimensions(self):
+    def getSliceDimensions(self) -> Tuple:
         return self.slice_width, self.slice_height
     # end def
 
-    def getOligoList(self):
+    def getOligoList(self) -> List:
         oligo_list = []
         for oligo in self.part.oligos():
             color = oligo.getColor()
@@ -108,7 +111,7 @@ class CadnanoSliceSvg(object):
         self.makeSliceSvg(scaled_w, scaled_h)
     # end def
 
-    def makeSliceVhGroup(self):
+    def makeSliceVhGroup(self) -> G:
         """
         Creates and returns a 'G' object for Slice Virtual Helices.
         """
@@ -128,7 +131,7 @@ class CadnanoSliceSvg(object):
         return g
     # end def
 
-    def makeSliceVhLabelGroup(self):
+    def makeSliceVhLabelGroup(self) -> G:
         """
         Creates and returns a 'G' object for Slice VirtualHelix Labels.
         """
@@ -150,7 +153,7 @@ class CadnanoSliceSvg(object):
         return g
     # end def
 
-    def makeSliceSvg(self, width, height):
+    def makeSliceSvg(self, width, height) -> Svg:
         slice_svg = Svg(width=width, height=height)
         viewbox = "0 0 %s %s" % (width, height)
         slice_svg.set_viewBox(viewbox)
@@ -159,6 +162,7 @@ class CadnanoSliceSvg(object):
         slice_svg.addElement(self.g_slicevirtualhelices)  # bottom layer
         slice_svg.addElement(self.g_slicevirtualhelixlabels)  # top layer
         slice_svg.save(self.output_path)
+        return slice_svg
     # end def
 # end class
 
@@ -192,7 +196,7 @@ class CadnanoPathSvg(object):
         # self.y_coords = self.mapIdnumsToYcoords()
     # end def
 
-    def mapIdnumsToYcoords(self):
+    def mapIdnumsToYcoords(self) -> Dict:
         d = {}
         for i in range(len(self.cn_doc.vh_order)):
             id_num = self.cn_doc.vh_order[i]
@@ -203,7 +207,7 @@ class CadnanoPathSvg(object):
             d[id_num] = y
         return d
 
-    def makePathVhGroup(self):
+    def makePathVhGroup(self) -> G:
         """
         Creates and returns a 'G' object for Path Virtual Helices.
         """
@@ -221,7 +225,7 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
-    def makePathVhLabelGroup(self):
+    def makePathVhLabelGroup(self) -> G:
         """
         Creates and returns a 'G' object for Path VirtualHelix Labels.
         """
@@ -242,7 +246,7 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
-    def makePathGridlinesGroup(self):
+    def makePathGridlinesGroup(self) -> G:
         size = self.cn_doc.max_vhelix_length
         print(size)
         _BW = self._base_width
@@ -263,7 +267,7 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
-    def makePathOligosGroup(self):
+    def makePathOligosGroup(self) -> G:
         id_coords = self.mapIdnumsToYcoords()
         oligo_list = self.cn_doc.getOligoList()
         _BW = self._base_width
@@ -305,7 +309,7 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
-    def makePathEndpointsGroup(self):
+    def makePathEndpointsGroup(self) -> G:
         _BW = self._base_width
         _BH = self.base_height
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
@@ -352,8 +356,8 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
-    def makePathSvg(self, width, height):
-        viewbox="0 0 %s %s" % (width, height)
+    def makePathSvg(self, width, height) -> Svg:
+        viewbox  = "0 0 %s %s" % (width, height)
         path_svg = Svg(width=width, height=height)
         path_svg.set_viewBox(viewbox)
         path_svg.set_preserveAspectRatio("xMinYMid meet")
@@ -364,17 +368,40 @@ class CadnanoPathSvg(object):
         path_svg.addElement(self.g_pathvirtualhelices)
         path_svg.addElement(self.g_pathvirtualhelixlabels)  # top layer
         path_svg.save(self.output_path)
+        return path_svg
     # end def
 # end class
 
 
-def main(argv):
-    for design in ['octa.7560.v1.7']:
-        cndoc = CadnanoDocument(design+'.json')
-        CadnanoSliceSvg(cndoc, design+'_slice.svg')
-        CadnanoPathSvg(cndoc, design+'_path.svg')
+def main():
+    parser  = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--input', '-i', type=str, required=True, nargs='+', help='Cadnano json file(s)')
+    parser.add_argument('--output', '-o', type=str, help='Output directory')
+    args    = parser.parse_args()
+
+    if args.input is None:
+        parser.print_help()
+        sys.exit('Input file not specified')
+
+    json_files          = [filename for filename in args.input if filename.endswith('.json')]
+    output_directory    = args.output
+
+    if not json_files:
+        parser.print_help()
+        sys.exit('Input file(s) is/are not JSON files')
+
+    for design in json_files:
+        basename        = os.path.splitext(os.path.basename(design))[0]
+        base_path       = os.path.splitext(design)[0]
+        cndoc           = CadnanoDocument(design)
+        output_slice    = os.path.join(output_directory, '%s_slice.svg' % basename) if output_directory and os.path.exists(output_directory)\
+                            else '%s_slice.svg' % base_path
+        output_path     = os.path.join(output_directory, '%s_path.svg' % basename) if output_directory and os.path.exists(output_directory) \
+                            else '%s_path.svg' % base_path
+        CadnanoSliceSvg(cndoc, output_slice)
+        CadnanoPathSvg(cndoc, output_path)
 # end def
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()

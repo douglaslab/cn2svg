@@ -258,7 +258,7 @@ class CadnanoPathSvg(object):
             x = self.PATH_X_PADDING + self._path_radius_scaled*3
             y = self.PATH_Y_PADDING + self._path_vh_margin*i
             h_lines = " ".join("M %s,%s h %s" % (x, y-_BH+j*_BH, _BW*size) for j in range(3))
-            v_lines = " ".join("M %s,%s v %s" % (x+j*_BW, y-_BH, _BH*2) for j in range(size+1))
+            v_lines = " ".join("M %s,%s v %s" % (x+j*_BW, y-_BH, _BH*2) for j in range(int(size)+1))
             p = Path(h_lines + " " + v_lines)
             grid_style = 'fill:none; stroke:#666666; stroke-width:0.25'
             p.set_style(grid_style)

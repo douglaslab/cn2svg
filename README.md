@@ -14,8 +14,18 @@ The output should include two separate files: `cadnanofile_slice.svg` and `cadna
 
 ## Dependencies
 
-- [cadnano2.5](https://github.com/cadnano/cadnano2.5)
+- [cadnano2.5](https://github.com/douglaslab/cadnano2.5)
 - [pysvg-py3](https://github.com/alorence/pysvg-py3)
+
+## VENV Installation
+
+```
+mkvirtualenv myvenv
+pip3 install PyQt5==5.10.0 pandas termcolor pysvg-py3
+git clone https://github.com/douglaslab/cadnano2.5
+cd cadnano2.5/
+python3 setup.py install
+```
 
 ## Notes
 

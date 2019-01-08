@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import argparse
+from collections import defaultdict
 from math import floor
 import os
 import sys
 from typing import Dict, List, Tuple
 
-from pysvg.shape import Circle, Path, Rect, Polygon  # Line, Polyline
-from pysvg.structure import G, Svg
+from pysvg.shape import Circle, Path, Rect, Polygon, Line  # Polyline
+from pysvg.structure import Defs, G, Svg, Use
 from pysvg.text import Text
 
 import cadnano
@@ -33,17 +34,20 @@ class CadnanoDocument(object):
         self.part = part = doc.activePart()
         self.part_props = part_props = part.getModelProperties().copy()
         self.vh_order = part_props['virtual_helix_order']
+        print(self.vh_order)
         self.vh_props, self.vh_origins = part.helixPropertiesAndOrigins()
         self.vh_radius = part.radius()
         self.max_vhelix_length = max(self.vh_props['length'])
 
         # Determine part coordinate boundaries
         xLL, yLL, xUR, yUR = part.getVirtualHelixOriginLimits()
-        print(xLL, yLL, xUR, yUR)
+        # print(xLL, yLL, xUR, yUR)
         self.slice_width = xUR-xLL + self.vh_radius * 8
         self.slice_height = yUR-yLL + self.vh_radius * 6
         self.x_offset = self.slice_width/2
         self.y_offset = self.slice_height/2
+
+        self.insertions, self.skips = self.getInsertionsAndSkips()
     # end def
 
     def getSliceDimensions(self) -> Tuple:
@@ -81,14 +85,24 @@ class CadnanoDocument(object):
         return ends5p, ends3p
     # end def
 
-    def insertions(self):
-        pass
-    # end def
+    def getInsertionsAndSkips(self):
+        insertion_dict = defaultdict(list)
+        skip_dict = defaultdict(list)
 
-    def skips(self):
-        pass
-    # end def
+        part_insertions = self.part.insertions()
 
+        for id_num in self.vh_order:
+            vh_insertions = part_insertions[id_num]
+            for idx, insertion in vh_insertions.items():
+                if insertion.isSkip():
+                    skip_dict[id_num].append((idx, insertion.length()))
+                else:
+                    insertion_dict[id_num].append((idx, insertion.length()))
+
+        print(insertion_dict)
+        print(skip_dict)
+        return insertion_dict, skip_dict
+    # end def
 # end class
 
 
@@ -182,18 +196,20 @@ class CadnanoPathSvg(object):
         self._path_radius_scaled = cn_doc.vh_radius*scale
         self._path_vh_fontsize = floor(2*self._path_radius_scaled*0.75)
         self._path_vh_margin = self._path_radius_scaled*5
-        self._base_width = self.base_height = self._path_radius_scaled
+        self._base_width = self._base_height = self._path_radius_scaled
+
+        self.defs = self.makePathDefs()
 
         self.g_pathvirtualhelices = self.makePathVhGroup()
         self.g_pathvirtualhelixlabels = self.makePathVhLabelGroup()
         self.g_pathgridlines = self.makePathGridlinesGroup()
         self.g_patholigos = self.makePathOligosGroup()
         self.g_pathendpoints = self.makePathEndpointsGroup()
+
+        self.g_pathskips = self.makePathSkipsGroup()
         w = self.PATH_X_PADDING*3 + cn_doc.max_vhelix_length*self._base_width
         h = len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2
         self.path_svg = self.makePathSvg(width=w, height=h)
-
-        # self.y_coords = self.mapIdnumsToYcoords()
     # end def
 
     def mapIdnumsToYcoords(self) -> Dict:
@@ -201,7 +217,7 @@ class CadnanoPathSvg(object):
         for i in range(len(self.cn_doc.vh_order)):
             id_num = self.cn_doc.vh_order[i]
             # y0 = self.PATH_Y_PADDING + self._path_vh_margin*i
-            # y1 = y0 + self.base_height
+            # y1 = y0 + self._base_height
             # d[id_num] = [y0, y1]
             y = self.PATH_Y_PADDING + self._path_vh_margin*i
             d[id_num] = y
@@ -250,7 +266,7 @@ class CadnanoPathSvg(object):
         size = self.cn_doc.max_vhelix_length
         print(size)
         _BW = self._base_width
-        _BH = self.base_height
+        _BH = self._base_height
         g = G()
         g.setAttribute("id", "GridLines")
         for i in range(len(self.cn_doc.vh_order)):
@@ -271,7 +287,7 @@ class CadnanoPathSvg(object):
         id_coords = self.mapIdnumsToYcoords()
         oligo_list = self.cn_doc.getOligoList()
         _BW = self._base_width
-        _BH = self.base_height
+        _BH = self._base_height
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3 + _BW/2
         g = G()
         g.setAttribute("id", "Oligos")
@@ -300,7 +316,7 @@ class CadnanoPathSvg(object):
                     path_lines.append("M %s, %s h %s" % (x, y, dx))
                 prev_id, prev5, prev3, prevX, prevY = id_num, idx5, idx3, x, y
             p = Path(" ".join(path_lines))
-            oligo_style = 'fill:none; stroke:%s; stroke-width:1' % color
+            oligo_style = 'fill:none; stroke:%s; stroke-width:2' % color
             p.set_style(oligo_style)
             p.setAttribute("id", "oligo_%s" % i)
             p.setAttribute("stroke-linejoin", "round")
@@ -311,7 +327,7 @@ class CadnanoPathSvg(object):
 
     def makePathEndpointsGroup(self) -> G:
         _BW = self._base_width
-        _BH = self.base_height
+        _BH = self._base_height
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
         id_coords = self.mapIdnumsToYcoords()
         ends5p, ends3p = self.cn_doc.getOligoEndpointsList()
@@ -356,35 +372,79 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
+    def makePathDefs(self) -> Defs:
+        _BW = self._base_width
+        _BH = self._base_height
+        line1 = Line(0, 0, _BW, _BH, style="stroke:#cc0000; stroke-width:2")
+        line2 = Line(_BW, 0, 0, _BH, style="stroke:#cc0000; stroke-width:2")
+        g = G()
+        g.setAttribute("id", "skip")
+        g.addElement(line1)
+        g.addElement(line2)
+        path_defs = Defs()
+        path_defs.addElement(g)
+        return path_defs
+
     def makePathSvg(self, width, height) -> Svg:
-        viewbox  = "0 0 %s %s" % (width, height)
+        viewbox = "0 0 %s %s" % (width, height)
         path_svg = Svg(width=width, height=height)
         path_svg.set_viewBox(viewbox)
         path_svg.set_preserveAspectRatio("xMinYMid meet")
         path_svg.setAttribute("id", "Cadnano_Path")  # Main layer name
+        path_svg.addElement(self.defs)
         path_svg.addElement(self.g_pathgridlines)  # bottom layer
         path_svg.addElement(self.g_patholigos)
         path_svg.addElement(self.g_pathendpoints)
         path_svg.addElement(self.g_pathvirtualhelices)
         path_svg.addElement(self.g_pathvirtualhelixlabels)  # top layer
+        path_svg.addElement(self.g_pathskips)
         path_svg.save(self.output_path)
+
         return path_svg
     # end def
+
+    def makePathSkipsGroup(self) -> G:
+        """
+        Creates and returns a 'G' object for Path VirtualHelix Labels.
+        """
+        _BW = self._base_width
+        _BH = self._base_height
+        _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
+        id_coords = self.mapIdnumsToYcoords()
+
+        g = G()
+        g.setAttribute("id", "PathSkips")
+        skips = self.cn_doc.skips
+
+        for id_num in skips.keys():
+            skip_y = id_coords[id_num]
+            for skip_idx, _ in skips[id_num]:
+                skip_x = _BW*skip_idx + _pX
+                u = Use()
+                u.setAttribute('xlink:href', '#skip')
+                u.setAttribute('x', skip_x)
+                u.setAttribute('y', skip_y)
+                g.addElement(u)
+            # get (x,y) coord of skip index
+            # draw a red x
+        return g
+    # end def
+
 # end class
 
 
 def main():
-    parser  = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--input', '-i', type=str, required=True, nargs='+', help='Cadnano json file(s)')
     parser.add_argument('--output', '-o', type=str, help='Output directory')
-    args    = parser.parse_args()
+    args = parser.parse_args()
 
     if args.input is None:
         parser.print_help()
         sys.exit('Input file not specified')
 
-    json_files          = [filename for filename in args.input if filename.endswith('.json')]
-    output_directory    = args.output
+    json_files = [filename for filename in args.input if filename.endswith('.json')]
+    output_directory = args.output
 
     if not json_files:
         parser.print_help()

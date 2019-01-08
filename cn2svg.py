@@ -85,16 +85,25 @@ class CadnanoDocument(object):
     # end def
 
     def getInsertionsAndSkips(self):
+        part = self.part
         insertion_dict = defaultdict(list)
         skip_dict = defaultdict(list)
-        part_insertions = self.part.insertions()
+        part_insertions = part.insertions()
         for id_num in self.vh_order:
             vh_insertions = part_insertions[id_num]
             for idx, insertion in vh_insertions.items():
                 if insertion.isSkip():
                     skip_dict[id_num].append((idx, insertion.length()))
                 else:
-                    insertion_dict[id_num].append((idx, insertion.length()))
+                    has_fwd, has_rev = part.hasStrandAtIdx(id_num, idx)
+                    fwd_col, rev_color = '#cccccc', '#cccccc'  # Defaults
+                    if has_fwd:
+                        fwd_strand = part.getStrand(True, id_num, idx)
+                        fwd_col = fwd_strand.getColor()
+                    if has_rev:
+                        rev_strand = part.getStrand(False, id_num, idx)
+                        rev_col = rev_strand.getColor()
+                    insertion_dict[id_num].append((idx, insertion.length(), fwd_col, rev_col))
         return insertion_dict, skip_dict
     # end def
 # end class
@@ -200,6 +209,7 @@ class CadnanoPathSvg(object):
         self.g_patholigos = self.makePathOligosGroup()
         self.g_pathendpoints = self.makePathEndpointsGroup()
 
+        self.g_pathinsertions = self.makePathInsertionsGroup()
         self.g_pathskips = self.makePathSkipsGroup()
         w = self.PATH_X_PADDING*3 + cn_doc.max_vhelix_length*self._base_width
         h = len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2
@@ -368,21 +378,97 @@ class CadnanoPathSvg(object):
     # end def
 
     def makePathDefs(self) -> Defs:
+        """
+        Creates Defs object for reusable `Insertion` and `Skip` elements.
+        """
+        _BW, _BH = self._base_width, self._base_height
+        _hBW, _hBH = _BW/2, _BH/2
+        _67BW, _67BH = _BW/1.5, _BH/1.5
+
+        p = Path()
+        p.appendMoveToPath(_hBW, _hBH)
+        p.appendQuadraticCurveToPath(-_67BW, -_BH, 0, -_BH)
+        p.appendQuadraticCurveToPath(_67BW, 0, 0, _BH)
+        p.set_stroke_linecap("round")
+        g_insertion = G()
+        g_insertion.setAttribute("id", "insertion")
+        g_insertion.addElement(p)
+
+        # g_insertion_hBW, _hBH
+
         _BW = self._base_width
         _BH = self._base_height
-        line1 = Line(0, 0, _BW, _BH, style="stroke:#cc0000; stroke-width:2")
-        line2 = Line(_BW, 0, 0, _BH, style="stroke:#cc0000; stroke-width:2")
-        g = G()
-        g.setAttribute("id", "skip")
-        g.addElement(line1)
-        g.addElement(line2)
+        d = 0.5  # small delta to compensate for round endcap
+        line1 = Line(d, d, _BW-d, _BH-d, style="stroke:#cc0000; stroke-width:2")
+        line2 = Line(_BW-d, d, d, _BH-d, style="stroke:#cc0000; stroke-width:2")
+        line1.set_stroke_linecap("round")
+        line2.set_stroke_linecap("round")
+        g_skip = G()
+        g_skip.setAttribute("id", "skip")
+        g_skip.addElement(line1)
+        g_skip.addElement(line2)
+
         path_defs = Defs()
-        path_defs.addElement(g)
+        path_defs.addElement(g_insertion)
+        path_defs.addElement(g_skip)
         return path_defs
+
+    def makePathInsertionsGroup(self) -> G:
+        part = self.cn_doc.part
+        id_coords = self.mapIdnumsToYcoords()
+        _BW = self._base_width
+        _hBW = _BW/2
+        _BH = self._base_height
+        _hBH = _BH/2
+        _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
+
+        g = G()
+        g.setAttribute("id", "PathInsertions")
+        g.setAttribute("font-size", "5")
+        g.setAttribute("font-family", "'SourceSansPro-Regular'")
+        g.setAttribute("text-anchor", "middle")
+
+        insertions = self.cn_doc.insertions
+
+        for id_num in sorted(insertions.keys(), reverse=True):
+            fwd_ins_y = id_coords[id_num] - _BH
+            rev_ins_y = id_coords[id_num]
+            for ins_idx, ins_len, fwd_col, rev_col in insertions[id_num][::-1]:
+                ins_g = G()
+                ins_g.setAttribute("id", "Ins %s[%s]" % (id_num, ins_idx))
+                ins_x = _BW*ins_idx + _pX
+                ins_fwd, ins_rev = part.hasStrandAtIdx(id_num, ins_idx)
+                if ins_fwd:
+                    u = Use()
+                    u.setAttribute('xlink:href', '#insertion')
+                    u.setAttribute('x', ins_x)
+                    u.setAttribute('y', fwd_ins_y)
+                    fwd_style = 'fill:none; stroke:%s; stroke-width:2' % fwd_col
+                    u.set_style(fwd_style)
+                    ins_g.addElement(u)
+                    t = Text('%s' % ins_len, ins_x+_hBW, fwd_ins_y)
+                    t.set_style('fill:#999999')
+                    ins_g.addElement(t)
+                if ins_rev:
+                    u = Use()
+                    u.setAttribute('xlink:href', '#insertion')
+                    u.setAttribute('x', ins_x)
+                    u.setAttribute('y', rev_ins_y)
+                    rev_style = 'fill:none; stroke:%s; stroke-width:2' % rev_col
+                    u.set_style(rev_style)
+                    u.set_transform('rotate(180,%s,%s)' % (ins_x+_hBW, rev_ins_y+_hBH))
+                    ins_g.addElement(u)
+                    t = Text('%s' % ins_len, ins_x+_hBW, rev_ins_y+_BH*1.3)
+                    t.set_style('fill:#999999')
+                    ins_g.addElement(t)
+                g.addElement(ins_g)
+        # print(g.getXML())
+        return g
 
     def makePathSkipsGroup(self) -> G:
         """
         Creates and returns a 'G' object for Path VirtualHelix Labels.
+        Elements are added in reverse order
         """
         _BW = self._base_width
         _BH = self._base_height
@@ -395,10 +481,12 @@ class CadnanoPathSvg(object):
         g.setAttribute("id", "PathSkips")
         skips = self.cn_doc.skips
 
-        for id_num in skips.keys():
+        for id_num in sorted(skips.keys(), reverse=True):
             fwd_skip_y = id_coords[id_num] - _BH
             rev_skip_y = id_coords[id_num]
-            for skip_idx, _ in skips[id_num]:
+            for skip_idx, _ in skips[id_num][::-1]:
+                skip_g = G()
+                skip_g.setAttribute("id", "Skip %s[%s]" % (id_num, skip_idx))
                 skip_x = _BW*skip_idx + _pX
                 skip_fwd, skip_rev = part.hasStrandAtIdx(id_num, skip_idx)
                 if skip_fwd:
@@ -406,13 +494,14 @@ class CadnanoPathSvg(object):
                     u.setAttribute('xlink:href', '#skip')
                     u.setAttribute('x', skip_x)
                     u.setAttribute('y', fwd_skip_y)
-                    g.addElement(u)
+                    skip_g.addElement(u)
                 if skip_rev:
                     u = Use()
                     u.setAttribute('xlink:href', '#skip')
                     u.setAttribute('x', skip_x)
                     u.setAttribute('y', rev_skip_y)
-                    g.addElement(u)
+                    skip_g.addElement(u)
+                g.addElement(skip_g)
         return g
     # end def
 
@@ -428,6 +517,7 @@ class CadnanoPathSvg(object):
         path_svg.addElement(self.g_pathendpoints)
         path_svg.addElement(self.g_pathvirtualhelices)
         path_svg.addElement(self.g_pathvirtualhelixlabels)  # top layer
+        path_svg.addElement(self.g_pathinsertions)
         path_svg.addElement(self.g_pathskips)
         path_svg.save(self.output_path)
 

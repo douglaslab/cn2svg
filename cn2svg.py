@@ -61,7 +61,7 @@ class CadnanoDocument(object):
             strand5p = oligo.strand5p()
             for s in strand5p.generator3pStrand():
                 strands.append([s.idNum(), s.idx5Prime(), s.idx3Prime(), s.isForward()])
-            oligo_list.append([color, strands])
+            oligo_list.append([color, oligo.isCircular(), strands])
         return oligo_list
     # end def
 
@@ -258,7 +258,6 @@ class CadnanoPathSvg(object):
 
     def makePathGridlinesGroup(self) -> G:
         size = self.cn_doc.max_vhelix_length
-        print(size)
         _BW = self._base_width
         _BH = self._base_height
         g = G()
@@ -286,9 +285,11 @@ class CadnanoPathSvg(object):
         g = G()
         g.setAttribute("id", "Oligos")
         i = 0
-        for color, strands in oligo_list:
+        for color, is_circular, strands in oligo_list:
             prev_id, prev5, prev3, prevX, prevY = None, None, None, 0, 0
             path_lines = []
+            if is_circular:
+                strands.append(strands[0])
             for id_num, idx5, idx3, isfwd in strands:
                 x = _pX + idx5*_BW
                 if idx5 < idx3:  # top strand

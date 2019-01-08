@@ -34,7 +34,6 @@ class CadnanoDocument(object):
         self.part = part = doc.activePart()
         self.part_props = part_props = part.getModelProperties().copy()
         self.vh_order = part_props['virtual_helix_order']
-        print(self.vh_order)
         self.vh_props, self.vh_origins = part.helixPropertiesAndOrigins()
         self.vh_radius = part.radius()
         self.max_vhelix_length = max(self.vh_props['length'])
@@ -88,9 +87,7 @@ class CadnanoDocument(object):
     def getInsertionsAndSkips(self):
         insertion_dict = defaultdict(list)
         skip_dict = defaultdict(list)
-
         part_insertions = self.part.insertions()
-
         for id_num in self.vh_order:
             vh_insertions = part_insertions[id_num]
             for idx, insertion in vh_insertions.items():
@@ -98,9 +95,6 @@ class CadnanoDocument(object):
                     skip_dict[id_num].append((idx, insertion.length()))
                 else:
                     insertion_dict[id_num].append((idx, insertion.length()))
-
-        print(insertion_dict)
-        print(skip_dict)
         return insertion_dict, skip_dict
     # end def
 # end class
@@ -385,6 +379,42 @@ class CadnanoPathSvg(object):
         path_defs.addElement(g)
         return path_defs
 
+    def makePathSkipsGroup(self) -> G:
+        """
+        Creates and returns a 'G' object for Path VirtualHelix Labels.
+        """
+        _BW = self._base_width
+        _BH = self._base_height
+        _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
+        id_coords = self.mapIdnumsToYcoords()
+
+        part = self.cn_doc.part
+
+        g = G()
+        g.setAttribute("id", "PathSkips")
+        skips = self.cn_doc.skips
+
+        for id_num in skips.keys():
+            fwd_skip_y = id_coords[id_num] - _BH
+            rev_skip_y = id_coords[id_num]
+            for skip_idx, _ in skips[id_num]:
+                skip_x = _BW*skip_idx + _pX
+                skip_fwd, skip_rev = part.hasStrandAtIdx(id_num, skip_idx)
+                if skip_fwd:
+                    u = Use()
+                    u.setAttribute('xlink:href', '#skip')
+                    u.setAttribute('x', skip_x)
+                    u.setAttribute('y', fwd_skip_y)
+                    g.addElement(u)
+                if skip_rev:
+                    u = Use()
+                    u.setAttribute('xlink:href', '#skip')
+                    u.setAttribute('x', skip_x)
+                    u.setAttribute('y', rev_skip_y)
+                    g.addElement(u)
+        return g
+    # end def
+
     def makePathSvg(self, width, height) -> Svg:
         viewbox = "0 0 %s %s" % (width, height)
         path_svg = Svg(width=width, height=height)
@@ -402,34 +432,6 @@ class CadnanoPathSvg(object):
 
         return path_svg
     # end def
-
-    def makePathSkipsGroup(self) -> G:
-        """
-        Creates and returns a 'G' object for Path VirtualHelix Labels.
-        """
-        _BW = self._base_width
-        _BH = self._base_height
-        _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
-        id_coords = self.mapIdnumsToYcoords()
-
-        g = G()
-        g.setAttribute("id", "PathSkips")
-        skips = self.cn_doc.skips
-
-        for id_num in skips.keys():
-            skip_y = id_coords[id_num]
-            for skip_idx, _ in skips[id_num]:
-                skip_x = _BW*skip_idx + _pX
-                u = Use()
-                u.setAttribute('xlink:href', '#skip')
-                u.setAttribute('x', skip_x)
-                u.setAttribute('y', skip_y)
-                g.addElement(u)
-            # get (x,y) coord of skip index
-            # draw a red x
-        return g
-    # end def
-
 # end class
 
 

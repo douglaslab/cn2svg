@@ -24,7 +24,7 @@ class CadnanoDocument(object):
     Opens and Parses a Cadnano file. Provides accessors for cadnano design
     parameters needed for SVG conversion.
     """
-    def __init__(self, cnjsonpath: str) -> None:
+    def __init__(self, cnjsonpath: str, sequence:str) -> None:
         super(CadnanoDocument, self).__init__()
         self.cnjsonpath = cnjsonpath
 
@@ -47,11 +47,28 @@ class CadnanoDocument(object):
         self.y_offset = self.slice_height/2
 
         self.insertions, self.skips = self.getInsertionsAndSkips()
+
+        self.sequence_applied = False
+        self.max_oligo_length = 0
+        self.applySequenceToSameLengthOligos(sequence)
     # end def
 
     def getSliceDimensions(self) -> Tuple:
         return self.slice_width, self.slice_height
     # end def
+
+    def applySequenceToSameLengthOligos(self, sequence) -> None:
+        seq_length = len(sequence)
+        for oligo in self.part.oligos():
+            oligo_len = oligo.length()
+            if oligo_len > self.max_oligo_length:
+                self.max_oligo_length = oligo_len
+            if oligo_len == seq_length:
+                s = oligo.strand5p()
+                fwd = 'fwd' if s.isForward() else 'rev'
+                print('Applying sequence at %s[%s] (%s strand)' % (s.idNum(), s.idx5Prime(), fwd))
+                oligo.applySequence(sequence, use_undostack=False)
+                self.sequence_applied = True
 
     def getOligoList(self) -> List:
         oligo_list = []
@@ -60,12 +77,12 @@ class CadnanoDocument(object):
             strands = []
             strand5p = oligo.strand5p()
             for s in strand5p.generator3pStrand():
-                strands.append([s.idNum(), s.idx5Prime(), s.idx3Prime(), s.isForward()])
+                strands.append([s.idNum(), s.idx5Prime(), s.idx3Prime(), s.isForward(), s.sequence()])
             oligo_list.append([color, oligo.isCircular(), strands])
         return oligo_list
     # end def
 
-    def getOligoEndpointsList(self):
+    def getOligoEndpointsList(self) -> Tuple:
         ends5p = []
         ends3p = []
         for oligo in self.part.oligos():
@@ -84,7 +101,7 @@ class CadnanoDocument(object):
         return ends5p, ends3p
     # end def
 
-    def getInsertionsAndSkips(self):
+    def getInsertionsAndSkips(self) -> Tuple:
         part = self.part
         insertion_dict = defaultdict(list)
         skip_dict = defaultdict(list)
@@ -135,7 +152,7 @@ class CadnanoSliceSvg(object):
         vh_radius = self.cn_doc.vh_radius
         _SLICE_SCALE = self._scale
         g = G()
-        g.setAttribute("id", "VirtualHelices")
+        g.setAttribute('id', "VirtualHelices")
         for id_num in self.cn_doc.vh_order[::-1]:
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
             x = vh_x + self.cn_doc.x_offset
@@ -143,7 +160,7 @@ class CadnanoSliceSvg(object):
             c = Circle(x*_SLICE_SCALE, y*_SLICE_SCALE, vh_radius*_SLICE_SCALE)
             circle_style = 'fill:#f2ca9a; stroke:#cc6600; stroke-width:1;'
             c.set_style(circle_style)
-            c.setAttribute("id", "circle_"+self.cn_doc.vh_props['name'][id_num])
+            c.setAttribute('id', "circle_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(c)
         return g
     # end def
@@ -154,8 +171,8 @@ class CadnanoSliceSvg(object):
         """
         _SLICE_SCALE = self._scale
         g = G()
-        g.setAttribute("id", "VirtualHelixLabels")
-        g.setAttribute("font-size", "%s" % self._slice_vh_fontsize)
+        g.setAttribute('id', "VirtualHelixLabels")
+        g.setAttribute('font-size', "%s" % self._slice_vh_fontsize)
         # g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
         g.setAttribute("font-family", "'SourceSansPro-Regular'")
         # g.setAttribute("font-family", "sans-serif")
@@ -165,7 +182,7 @@ class CadnanoSliceSvg(object):
             x = vh_x + self.cn_doc.x_offset
             y = -vh_y + self.cn_doc.y_offset + self.cn_doc.vh_radius/2.
             t = Text('%s' % id_num, x*_SLICE_SCALE, y*_SLICE_SCALE - 1)
-            t.setAttribute("id", "label_"+self.cn_doc.vh_props['name'][id_num])
+            t.setAttribute('id', "label_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(t)
         return g
     # end def
@@ -175,7 +192,7 @@ class CadnanoSliceSvg(object):
         viewbox = "0 0 %s %s" % (width, height)
         slice_svg.set_viewBox(viewbox)
         slice_svg.set_preserveAspectRatio("xMidYMid meet")
-        slice_svg.setAttribute("id", "Cadnano_Slice")  # Main layer name
+        slice_svg.setAttribute('id', "Cadnano_Slice")  # Main layer name
         slice_svg.addElement(self.g_slicevirtualhelices)  # bottom layer
         slice_svg.addElement(self.g_slicevirtualhelixlabels)  # top layer
         slice_svg.save(self.output_path)
@@ -208,9 +225,11 @@ class CadnanoPathSvg(object):
         self.g_pathgridlines = self.makePathGridlinesGroup()
         self.g_patholigos = self.makePathOligosGroup()
         self.g_pathendpoints = self.makePathEndpointsGroup()
-
         self.g_pathinsertions = self.makePathInsertionsGroup()
         self.g_pathskips = self.makePathSkipsGroup()
+        if cn_doc.sequence_applied:
+            self.g_pathsequences = self.makePathSequencesGroup()
+
         w = self.PATH_X_PADDING*3 + cn_doc.max_vhelix_length*self._base_width
         h = len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2
         self.path_svg = self.makePathSvg(width=w, height=h)
@@ -232,7 +251,7 @@ class CadnanoPathSvg(object):
         Creates and returns a 'G' object for Path Virtual Helices.
         """
         g = G()
-        g.setAttribute("id", "VirtualHelices")
+        g.setAttribute('id', "VirtualHelices")
         for i in range(len(self.cn_doc.vh_order)):
             id_num = self.cn_doc.vh_order[i]
             x = self.PATH_X_PADDING
@@ -240,7 +259,7 @@ class CadnanoPathSvg(object):
             c = Circle(x, y, self.cn_doc.vh_radius*self._scale)
             circle_style = 'fill:#f2ca9a; stroke:#cc6600; stroke-width:1;'
             c.set_style(circle_style)
-            c.setAttribute("id", "circle_"+self.cn_doc.vh_props['name'][id_num])
+            c.setAttribute('id', "circle_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(c)
         return g
     # end def
@@ -250,8 +269,8 @@ class CadnanoPathSvg(object):
         Creates and returns a 'G' object for Path VirtualHelix Labels.
         """
         g = G()
-        g.setAttribute("id", "VirtualHelixLabels")
-        g.setAttribute("font-size", "%s" % self._path_vh_fontsize)
+        g.setAttribute('id', "VirtualHelixLabels")
+        g.setAttribute('font-size', "%s" % self._path_vh_fontsize)
         g.setAttribute("font-family", "'SourceSansPro-Regular'")
         # g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
         # g.setAttribute("font-family", "sans-serif")
@@ -261,7 +280,7 @@ class CadnanoPathSvg(object):
             x = self.PATH_X_PADDING
             y = self.PATH_Y_PADDING + self._path_vh_margin*i + self._path_radius_scaled/2.
             t = Text('%s' % id_num, x, y)
-            t.setAttribute("id", "label_"+self.cn_doc.vh_props['name'][id_num])
+            t.setAttribute('id', "label_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(t)
         return g
     # end def
@@ -271,7 +290,7 @@ class CadnanoPathSvg(object):
         _BW = self._base_width
         _BH = self._base_height
         g = G()
-        g.setAttribute("id", "GridLines")
+        g.setAttribute('id', "GridLines")
         for i in range(len(self.cn_doc.vh_order)):
             id_num = self.cn_doc.vh_order[i]
             x = self.PATH_X_PADDING + self._path_radius_scaled*3
@@ -281,7 +300,7 @@ class CadnanoPathSvg(object):
             p = Path(h_lines + " " + v_lines)
             grid_style = 'fill:none; stroke:#666666; stroke-width:0.25'
             p.set_style(grid_style)
-            p.setAttribute("id", "grid_"+self.cn_doc.vh_props['name'][id_num])
+            p.setAttribute('id', "grid_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(p)
         return g
     # end def
@@ -293,14 +312,14 @@ class CadnanoPathSvg(object):
         _BH = self._base_height
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3 + _BW/2
         g = G()
-        g.setAttribute("id", "Oligos")
+        g.setAttribute('id', "Oligos")
         i = 0
         for color, is_circular, strands in oligo_list:
             prev_id, prev5, prev3, prevX, prevY = None, None, None, 0, 0
             path_lines = []
             if is_circular:
                 strands.append(strands[0])
-            for id_num, idx5, idx3, isfwd in strands:
+            for id_num, idx5, idx3, isfwd, _ in strands:
                 x = _pX + idx5*_BW
                 if idx5 < idx3:  # top strand
                     y = id_coords[id_num] - _BH/2
@@ -323,7 +342,7 @@ class CadnanoPathSvg(object):
             p = Path(" ".join(path_lines))
             oligo_style = 'fill:none; stroke:%s; stroke-width:2' % color
             p.set_style(oligo_style)
-            p.setAttribute("id", "oligo_%s" % i)
+            p.setAttribute('id', "oligo_%s" % i)
             p.setAttribute("stroke-linejoin", "round")
             i += 1
             g.addElement(p)
@@ -338,7 +357,7 @@ class CadnanoPathSvg(object):
         ends5p, ends3p = self.cn_doc.getOligoEndpointsList()
         # print(ends5p, ends3p)
         g = G()
-        g.setAttribute("id", "Endpoints")
+        g.setAttribute('id', "Endpoints")
         i = 0
         for color, idnum5p, idx5p, isfwd5p in ends5p:
             if isfwd5p:
@@ -350,7 +369,7 @@ class CadnanoPathSvg(object):
             r = Rect(x=x, y=y, width=_BW*0.75, height=_BH*.9)
             endpoint_style = 'fill:%s; stroke:none; stroke-width:0.5' % color
             r.set_style(endpoint_style)
-            r.setAttribute("id", "end5p_%s" % i)
+            r.setAttribute('id', "end5p_%s" % i)
             i += 1
             g.addElement(r)
         j = 0
@@ -371,9 +390,44 @@ class CadnanoPathSvg(object):
             p = Polygon(points=pts)
             end3p_style = 'fill:%s; stroke:none; stroke-width:0.5' % color
             p.set_style(end3p_style)
-            p.setAttribute("id", "end3p_%s" % j)
+            p.setAttribute('id', "end3p_%s" % j)
             j += 1
             g.addElement(p)
+        return g
+    # end def
+
+    def makePathSequencesGroup(self) -> G:
+        """
+        Creates and returns a 'G' object for Path oligo sequences.
+        """
+        _BW = self._base_width
+        _BH = self._base_height
+        _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
+        id_coords = self.mapIdnumsToYcoords()
+        oligo_list = self.cn_doc.getOligoList()
+
+        g = G()
+        g.setAttribute('id', 'PathOligoSequences')
+        g.setAttribute('font-size', '8')
+        g.setAttribute('font-family', 'Monaco')
+
+        i = 0
+        for color, is_circular, strands in oligo_list:
+            g_oligo = G()
+            g_oligo.setAttribute('id', "oligo_seq_%s" % i)
+            i += 1
+            for id_num, idx5, idx3, isfwd, seq in strands:
+                x = _pX + idx5*_BW + _BW/4 if isfwd else _pX + idx5*_BW - _BW/4
+                y = id_coords[id_num] - _BH*1.1 if isfwd else id_coords[id_num] + _BH*2.2
+                t = Text('%s' % seq, x, y)
+                t.set_style('fill:%s66' % color)
+                strand_width = (idx3-idx5+1)*_BW if isfwd else (idx5-idx3+1)*_BW
+                t.setAttribute('textLength', strand_width)
+                if not isfwd:
+                    t.set_transform('rotate(180,%s,%s)' % (x+_BW/2, y-_BH/2))
+
+                g_oligo.addElement(t)
+            g.addElement(g_oligo)
         return g
     # end def
 
@@ -391,20 +445,16 @@ class CadnanoPathSvg(object):
         p.appendQuadraticCurveToPath(_67BW, 0, 0, _BH)
         p.set_stroke_linecap("round")
         g_insertion = G()
-        g_insertion.setAttribute("id", "insertion")
+        g_insertion.setAttribute('id', "insertion")
         g_insertion.addElement(p)
 
-        # g_insertion_hBW, _hBH
-
-        _BW = self._base_width
-        _BH = self._base_height
         d = 0.5  # small delta to compensate for round endcap
         line1 = Line(d, d, _BW-d, _BH-d, style="stroke:#cc0000; stroke-width:2")
         line2 = Line(_BW-d, d, d, _BH-d, style="stroke:#cc0000; stroke-width:2")
         line1.set_stroke_linecap("round")
         line2.set_stroke_linecap("round")
         g_skip = G()
-        g_skip.setAttribute("id", "skip")
+        g_skip.setAttribute('id', "skip")
         g_skip.addElement(line1)
         g_skip.addElement(line2)
 
@@ -423,8 +473,8 @@ class CadnanoPathSvg(object):
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
 
         g = G()
-        g.setAttribute("id", "PathInsertions")
-        g.setAttribute("font-size", "5")
+        g.setAttribute('id', "PathInsertions")
+        g.setAttribute('font-size', "5")
         g.setAttribute("font-family", "'SourceSansPro-Regular'")
         g.setAttribute("text-anchor", "middle")
 
@@ -435,7 +485,7 @@ class CadnanoPathSvg(object):
             rev_ins_y = id_coords[id_num]
             for ins_idx, ins_len, fwd_col, rev_col in insertions[id_num][::-1]:
                 ins_g = G()
-                ins_g.setAttribute("id", "Ins %s[%s]" % (id_num, ins_idx))
+                ins_g.setAttribute('id', "Ins %s[%s]" % (id_num, ins_idx))
                 ins_x = _BW*ins_idx + _pX
                 ins_fwd, ins_rev = part.hasStrandAtIdx(id_num, ins_idx)
                 if ins_fwd:
@@ -468,7 +518,8 @@ class CadnanoPathSvg(object):
     def makePathSkipsGroup(self) -> G:
         """
         Creates and returns a 'G' object for Path VirtualHelix Labels.
-        Elements are added in reverse order
+        Elements are sorted in reverse order so they are listed in
+        ascending order in Illustrator.
         """
         _BW = self._base_width
         _BH = self._base_height
@@ -478,7 +529,7 @@ class CadnanoPathSvg(object):
         part = self.cn_doc.part
 
         g = G()
-        g.setAttribute("id", "PathSkips")
+        g.setAttribute('id', "PathSkips")
         skips = self.cn_doc.skips
 
         for id_num in sorted(skips.keys(), reverse=True):
@@ -486,7 +537,7 @@ class CadnanoPathSvg(object):
             rev_skip_y = id_coords[id_num]
             for skip_idx, _ in skips[id_num][::-1]:
                 skip_g = G()
-                skip_g.setAttribute("id", "Skip %s[%s]" % (id_num, skip_idx))
+                skip_g.setAttribute('id', "Skip %s[%s]" % (id_num, skip_idx))
                 skip_x = _BW*skip_idx + _pX
                 skip_fwd, skip_rev = part.hasStrandAtIdx(id_num, skip_idx)
                 if skip_fwd:
@@ -506,11 +557,15 @@ class CadnanoPathSvg(object):
     # end def
 
     def makePathSvg(self, width, height) -> Svg:
+        """
+        Returns the main `Svg` object for Path view.
+
+        """
         viewbox = "0 0 %s %s" % (width, height)
         path_svg = Svg(width=width, height=height)
         path_svg.set_viewBox(viewbox)
         path_svg.set_preserveAspectRatio("xMinYMid meet")
-        path_svg.setAttribute("id", "Cadnano_Path")  # Main layer name
+        path_svg.setAttribute('id', "Cadnano_Path")  # Main layer name
         path_svg.addElement(self.defs)
         path_svg.addElement(self.g_pathgridlines)  # bottom layer
         path_svg.addElement(self.g_patholigos)
@@ -519,6 +574,10 @@ class CadnanoPathSvg(object):
         path_svg.addElement(self.g_pathvirtualhelixlabels)  # top layer
         path_svg.addElement(self.g_pathinsertions)
         path_svg.addElement(self.g_pathskips)
+        if self.cn_doc.sequence_applied:
+            path_svg.addElement(self.g_pathsequences)
+        else:
+            print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length)
         path_svg.save(self.output_path)
 
         return path_svg
@@ -528,31 +587,43 @@ class CadnanoPathSvg(object):
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--input', '-i', type=str, required=True, nargs='+', help='Cadnano json file(s)')
-    parser.add_argument('--output', '-o', type=str, help='Output directory')
+    parser.add_argument('--input', '-i', type=str, required=True, nargs=1, metavar='FILE', help='Cadnano JSON file')
+    parser.add_argument('--output', '-o', type=str, nargs='?', metavar='DIR', help='Output directory')
+    parser.add_argument('--seq', '-s', type=str, nargs='?', metavar='SEQUENCE.txt', help='Scaffold sequence file')
     args = parser.parse_args()
 
     if args.input is None:
         parser.print_help()
         sys.exit('Input file not specified')
 
-    json_files = [filename for filename in args.input if filename.endswith('.json')]
+    design = args.input[0]
+    if not design.endswith('.json'):
+        parser.print_help()
+        sys.exit('Input should be JSON file')
+
     output_directory = args.output
 
-    if not json_files:
-        parser.print_help()
-        sys.exit('Input file(s) is/are not JSON files')
+    sequence = ''
+    if args.seq is not None:
+        valid = 'ACTGactg'
+        with open(args.seq) as seqfile:
+            sequence = ''.join(seqfile.read().split())
+            if all(s in valid for s in sequence):
+                print('Found valid sequence file, %s bases' % len(sequence))
+            else:
+                sys.exit('Error: %s contains non-[ATCGactg] character(s)' % args.seq)
 
-    for design in json_files:
-        basename        = os.path.splitext(os.path.basename(design))[0]
-        base_path       = os.path.splitext(design)[0]
-        cndoc           = CadnanoDocument(design)
-        output_slice    = os.path.join(output_directory, '%s_slice.svg' % basename) if output_directory and os.path.exists(output_directory)\
-                            else '%s_slice.svg' % base_path
-        output_path     = os.path.join(output_directory, '%s_path.svg' % basename) if output_directory and os.path.exists(output_directory) \
-                            else '%s_path.svg' % base_path
-        CadnanoSliceSvg(cndoc, output_slice)
-        CadnanoPathSvg(cndoc, output_path)
+    basename = os.path.splitext(os.path.basename(design))[0]
+    base_path = os.path.splitext(design)[0]
+    cndoc = CadnanoDocument(design, sequence)
+    if output_directory and os.path.exists(output_directory):
+        output_slice = os.path.join(output_directory, '%s_slice.svg' % basename)
+        output_path = os.path.join(output_directory, '%s_path.svg' % basename)
+    else:
+        output_slice = '%s_slice.svg' % base_path
+        output_path = '%s_path.svg' % base_path
+    CadnanoSliceSvg(cndoc, output_slice)
+    CadnanoPathSvg(cndoc, output_path)
 # end def
 
 

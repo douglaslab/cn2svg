@@ -27,9 +27,11 @@ cd cadnano2.5/
 python3 setup.py install
 ```
 
-## Notes
+## About
 
-Rendering Cadnano designs in SVG format can be useful for making figures and schematics. SVG support was rather limited in Cadnano2 because it relied on the [QtSvgGenerator](https://doc.qt.io/qt-5/qsvggenerator.html) class to provide automatic conversion. The conversion did not retain any grouping based on the Cadnano data structures, and the resulting path strokes were scaled incorrectly, and required extensive manual editing.
+Rendering Cadnano designs in SVG format can be useful for making figures and schematics. However, SVG support was very limited in Cadnano2 because it relied on the [QtSvgGenerator](https://doc.qt.io/qt-5/qsvggenerator.html) class to provide automatic conversion. The conversion did not retain element groups based on the Cadnano data structures, and most path strokes were scaled incorrectly.
+
+As part of developing the new Cadnano Toolkit, we've rewritten the original SVG exporter as a standalone Python script, `cn2svg`. It provides a few new features under the hood, such as hooks for dynamic path styling via unique element id attributes, and element instancing using the `defs` and `use` tags.
 
 ## Citing
 

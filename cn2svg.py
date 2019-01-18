@@ -113,7 +113,7 @@ class CadnanoDocument(object):
                     skip_dict[id_num].append((idx, insertion.length()))
                 else:
                     has_fwd, has_rev = part.hasStrandAtIdx(id_num, idx)
-                    fwd_col, rev_color = '#cccccc', '#cccccc'  # Defaults
+                    fwd_col, rev_col = '#cccccc', '#cccccc'  # Defaults
                     if has_fwd:
                         fwd_strand = part.getStrand(True, id_num, idx)
                         fwd_col = fwd_strand.getColor()

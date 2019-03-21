@@ -12,6 +12,26 @@ cn2svg a rewrite of the SVG export tool found in the original cadnano ([Svg.as](
 
 The output should include two separate files: `cadnanofile_slice.svg` and `cadnanofile_path.svg`.
 
+## Sequence support
+
+To overlay DNA sequences onto path oligos, use the following option:
+
+`cn2svg -i cadnanofile.json --seq scaffold.txt`
+
+Sequence alignment and styling is currently formatted for browser viewing.
+
+## Exporting for Adobe Illustrator CS6
+
+By default, cn2svg exports SVGs formatted for web browser viewing. Unfortunately, if we [stylize the document](https://graphicdesign.stackexchange.com/questions/36168/is-there-any-way-to-set-fallback-font-families-in-illustrator-svg) with custom fonts via the `font-family` attribute, we run afoul of [a bug](https://forums.adobe.com/thread/1326594) in Adobe Illustrator CS6, which cannot open the file.
+
+The current workaround is to support the export of a custom SVG files that open in CS6. To invoke this option, use the `--cs6` flag:
+
+`cn2svg -i cadnanofile.json --cs6`
+
+Expected output: `cadnanofile_slice_cs6.svg` and `cadnanofile_path_cs6.svg`.
+
+Path oligo sequences will not match the browser appearance in CS6. You can improve alignment by adjusting the font size and tracking.
+
 ## Dependencies
 
 - [cadnano2.5](https://github.com/douglaslab/cadnano2.5)

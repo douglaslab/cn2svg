@@ -14,7 +14,6 @@ from pysvg.text import Text
 import cadnano
 from cadnano.document import Document
 
-
 DEFAULT_SLICE_SCALE = 10
 DEFAULT_PATH_SCALE = 10
 
@@ -37,15 +36,6 @@ class CadnanoDocument(object):
         self.vh_props, self.vh_origins = part.helixPropertiesAndOrigins()
         self.vh_radius = part.radius()
         self.max_vhelix_length = max(self.vh_props['length'])
-
-        # Determine part coordinate boundaries
-        xLL, yLL, xUR, yUR = part.getVirtualHelixOriginLimits()
-        # print(xLL, yLL, xUR, yUR)
-        self.slice_width = xUR-xLL + self.vh_radius * 8
-        self.slice_height = yUR-yLL + self.vh_radius * 6
-        self.x_offset = self.slice_width/2
-        self.y_offset = self.slice_height/2
-
         self.insertions, self.skips = self.getInsertionsAndSkips()
 
         self.sequence_applied = False
@@ -137,35 +127,46 @@ class CadnanoSliceSvg(object):
         self._scale = scale
         self._slice_radius_scaled = cn_doc.vh_radius*scale
         self._slice_vh_fontsize = floor(2*self._slice_radius_scaled*0.75)
-        self.g_slicevirtualhelices = self.makeSliceVhGroup()
-        self.g_slicevirtualhelixlabels = self.makeSliceVhLabelGroup()
-        w, h = self.cn_doc.getSliceDimensions()
-        scaled_w = w*scale
-        scaled_h = h*scale
-        self.makeSliceSvg(scaled_w, scaled_h)
+        self.g_slicevirtualhelices, w, h, transform = self.makeSliceVhGroup()
+        self.g_slicevirtualhelixlabels = self.makeSliceVhLabelGroup(transform)
+        self.makeSliceSvg(w, h)
     # end def
 
-    def makeSliceVhGroup(self) -> G:
+    def makeSliceVhGroup(self) -> Tuple:
         """
         Creates and returns a 'G' object for Slice Virtual Helices.
         """
-        vh_radius = self.cn_doc.vh_radius
         _SLICE_SCALE = self._scale
+        vh_radius = self.cn_doc.vh_radius * _SLICE_SCALE
         g = G()
         g.setAttribute('id', "VirtualHelices")
+        minx = 99999
+        miny = 99999
+        maxx = -99999
+        maxy = -99999
         for id_num in self.cn_doc.vh_order[::-1]:
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
-            x = vh_x + self.cn_doc.x_offset
-            y = -vh_y + self.cn_doc.y_offset
-            c = Circle(x*_SLICE_SCALE, y*_SLICE_SCALE, vh_radius*_SLICE_SCALE)
+            x = vh_x * _SLICE_SCALE  # + self.cn_doc.x_offset
+            y = -vh_y * _SLICE_SCALE  # + self.cn_doc.y_offset
+            minx = min(minx, x)
+            miny = min(miny, y)
+            maxx = max(maxx, x)
+            maxy = max(maxy, y)
+            c = Circle(x, y, vh_radius)
             circle_style = 'fill:#f2ca9a; stroke:#cc6600; stroke-width:1;'
             c.set_style(circle_style)
             c.setAttribute('id', "circle_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(c)
-        return g
+        minx = minx-vh_radius*2
+        miny = miny-vh_radius*2
+        width = maxx-minx+vh_radius*2
+        height = maxy-miny+vh_radius*2
+        transform = 'translate(%.3f %.3f)' % (-minx, -miny)
+        g.set_transform(transform)
+        return g, width, height, transform
     # end def
 
-    def makeSliceVhLabelGroup(self) -> G:
+    def makeSliceVhLabelGroup(self, transform) -> G:
         """
         Creates and returns a 'G' object for Slice VirtualHelix Labels.
         """
@@ -179,11 +180,12 @@ class CadnanoSliceSvg(object):
         g.setAttribute("text-anchor", "middle")
         for id_num in self.cn_doc.vh_order[::-1]:
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
-            x = vh_x + self.cn_doc.x_offset
-            y = -vh_y + self.cn_doc.y_offset + self.cn_doc.vh_radius/2.
+            x = vh_x  # + self.cn_doc.x_offset
+            y = -vh_y + self.cn_doc.vh_radius/2.
             t = Text('%s' % id_num, x*_SLICE_SCALE, y*_SLICE_SCALE - 1)
             t.setAttribute('id', "label_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(t)
+        g.set_transform(transform)
         return g
     # end def
 
@@ -355,7 +357,6 @@ class CadnanoPathSvg(object):
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
         id_coords = self.mapIdnumsToYcoords()
         ends5p, ends3p = self.cn_doc.getOligoEndpointsList()
-        # print(ends5p, ends3p)
         g = G()
         g.setAttribute('id', "Endpoints")
         i = 0

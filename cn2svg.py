@@ -120,10 +120,11 @@ class CadnanoSliceSvg(object):
     """
     Generate a Sliceview SVG for the given Cadnano document cn_doc.
     """
-    def __init__(self, cn_doc, output_path, scale=DEFAULT_SLICE_SCALE):
+    def __init__(self, cn_doc, output_path, cs6=False, scale=DEFAULT_SLICE_SCALE):
         super(CadnanoSliceSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
+        self.useCS6font = cs6
         self._scale = scale
         self._slice_radius_scaled = cn_doc.vh_radius*scale
         self._slice_vh_fontsize = floor(2*self._slice_radius_scaled*0.75)
@@ -174,9 +175,10 @@ class CadnanoSliceSvg(object):
         g = G()
         g.setAttribute('id', "VirtualHelixLabels")
         g.setAttribute('font-size', "%s" % self._slice_vh_fontsize)
-        # g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
-        g.setAttribute("font-family", "'SourceSansPro-Regular'")
-        # g.setAttribute("font-family", "sans-serif")
+        if self.useCS6font:
+            g.setAttribute("font-family", "'SourceSansPro-Regular'")
+        else:
+            g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
         g.setAttribute("text-anchor", "middle")
         for id_num in self.cn_doc.vh_order[::-1]:
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
@@ -210,10 +212,11 @@ class CadnanoPathSvg(object):
     PATH_X_PADDING = 40
     PATH_Y_PADDING = 40
 
-    def __init__(self, cn_doc, output_path, scale=DEFAULT_PATH_SCALE):
+    def __init__(self, cn_doc, output_path, cs6=False, scale=DEFAULT_PATH_SCALE):
         super(CadnanoPathSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
+        self.useCS6font = cs6
         self._scale = scale
         self._path_radius_scaled = cn_doc.vh_radius*scale
         self._path_vh_fontsize = floor(2*self._path_radius_scaled*0.75)
@@ -273,9 +276,10 @@ class CadnanoPathSvg(object):
         g = G()
         g.setAttribute('id', "VirtualHelixLabels")
         g.setAttribute('font-size', "%s" % self._path_vh_fontsize)
-        g.setAttribute("font-family", "'SourceSansPro-Regular'")
-        # g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
-        # g.setAttribute("font-family", "sans-serif")
+        if self.useCS6font:
+            g.setAttribute("font-family", "'SourceSansPro-Regular'")
+        else:
+            g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
         g.setAttribute("text-anchor", "middle")
         for i in range(len(self.cn_doc.vh_order)):
             id_num = self.cn_doc.vh_order[i]
@@ -591,6 +595,7 @@ def main():
     parser.add_argument('--input', '-i', type=str, required=True, nargs=1, metavar='FILE', help='Cadnano JSON file')
     parser.add_argument('--output', '-o', type=str, nargs='?', metavar='DIR', help='Output directory')
     parser.add_argument('--seq', '-s', type=str, nargs='?', metavar='SEQUENCE.txt', help='Scaffold sequence file')
+    parser.add_argument('--cs6', action='store_true', help='Use font-family compatible with Adobe Illustrator CS6 instead of web browser')
     args = parser.parse_args()
 
     if args.input is None:
@@ -617,14 +622,23 @@ def main():
     basename = os.path.splitext(os.path.basename(design))[0]
     base_path = os.path.splitext(design)[0]
     cndoc = CadnanoDocument(design, sequence)
+    # File Path
     if output_directory and os.path.exists(output_directory):
-        output_slice = os.path.join(output_directory, '%s_slice.svg' % basename)
-        output_path = os.path.join(output_directory, '%s_path.svg' % basename)
+        output_slice = os.path.join(output_directory, '%s_slice' % basename)
+        output_path = os.path.join(output_directory, '%s_path' % basename)
     else:
-        output_slice = '%s_slice.svg' % base_path
-        output_path = '%s_path.svg' % base_path
-    CadnanoSliceSvg(cndoc, output_slice)
-    CadnanoPathSvg(cndoc, output_path)
+        output_slice = '%s_slice' % base_path
+        output_path = '%s_path' % base_path
+    # File extension
+    if args.cs6:
+        output_slice += '_cs6.svg'
+        output_path += '_cs6.svg'
+    else:
+        output_slice += '.svg'
+        output_path += '.svg'
+
+    CadnanoSliceSvg(cndoc, output_slice, cs6=args.cs6)
+    CadnanoPathSvg(cndoc, output_path, cs6=args.cs6)
 # end def
 
 

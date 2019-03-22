@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-from collections import defaultdict
-from math import floor
+import json
 import os
 import sys
+from collections import defaultdict
+from contextlib import redirect_stdout
+from math import floor
 from typing import Dict, List, Tuple
 
 from pysvg.shape import Circle, Path, Rect, Polygon, Line  # Polyline
@@ -29,7 +31,8 @@ class CadnanoDocument(object):
 
         app = cadnano.app()
         doc = app.document = Document()
-        doc.readFile(cnjsonpath)
+        with redirect_stdout(sys.stderr):
+            doc.readFile(cnjsonpath)
         self.part = part = doc.activePart()
         self.part_props = part_props = part.getModelProperties().copy()
         self.vh_order = part_props['virtual_helix_order']
@@ -125,12 +128,14 @@ class CadnanoSliceSvg(object):
         self.cn_doc = cn_doc
         self.output_path = output_path
         self.useCS6font = cs6
+        self.w = None
+        self.h = None
         self._scale = scale
         self._slice_radius_scaled = cn_doc.vh_radius*scale
         self._slice_vh_fontsize = floor(2*self._slice_radius_scaled*0.75)
-        self.g_slicevirtualhelices, w, h, transform = self.makeSliceVhGroup()
+        self.g_slicevirtualhelices, self.w, self.h, transform = self.makeSliceVhGroup()
         self.g_slicevirtualhelixlabels = self.makeSliceVhLabelGroup(transform)
-        self.makeSliceSvg(w, h)
+        self.makeSliceSvg(self.w, self.h)
     # end def
 
     def makeSliceVhGroup(self) -> Tuple:
@@ -160,8 +165,8 @@ class CadnanoSliceSvg(object):
             g.addElement(c)
         minx = minx-vh_radius*2
         miny = miny-vh_radius*2
-        width = maxx-minx+vh_radius*2
-        height = maxy-miny+vh_radius*2
+        width = round(maxx-minx+vh_radius*2, 3)
+        height = round(maxy-miny+vh_radius*2, 3)
         transform = 'translate(%.3f %.3f)' % (-minx, -miny)
         g.set_transform(transform)
         return g, width, height, transform
@@ -217,6 +222,8 @@ class CadnanoPathSvg(object):
         self.cn_doc = cn_doc
         self.output_path = output_path
         self.useCS6font = cs6
+        self.w = None
+        self.h = None
         self._scale = scale
         self._path_radius_scaled = cn_doc.vh_radius*scale
         self._path_vh_fontsize = floor(2*self._path_radius_scaled*0.75)
@@ -235,9 +242,9 @@ class CadnanoPathSvg(object):
         if cn_doc.sequence_applied:
             self.g_pathsequences = self.makePathSequencesGroup()
 
-        w = self.PATH_X_PADDING*3 + cn_doc.max_vhelix_length*self._base_width
-        h = len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2
-        self.path_svg = self.makePathSvg(width=w, height=h)
+        self.w = round(self.PATH_X_PADDING*3 + cn_doc.max_vhelix_length*self._base_width, 3)
+        self.h = round(len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2, 3)
+        self.path_svg = self.makePathSvg(width=self.w, height=self.h)
     # end def
 
     def mapIdnumsToYcoords(self) -> Dict:
@@ -582,7 +589,7 @@ class CadnanoPathSvg(object):
         if self.cn_doc.sequence_applied:
             path_svg.addElement(self.g_pathsequences)
         else:
-            print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length)
+            print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length, file=sys.stderr)
         path_svg.save(self.output_path)
 
         return path_svg
@@ -615,7 +622,7 @@ def main():
         with open(args.seq) as seqfile:
             sequence = ''.join(seqfile.read().split())
             if all(s in valid for s in sequence):
-                print('Found valid sequence file, %s bases' % len(sequence))
+                print('Found valid sequence file, %s bases' % len(sequence), file=sys.stderr)
             else:
                 sys.exit('Error: %s contains non-[ATCGactg] character(s)' % args.seq)
 
@@ -637,8 +644,13 @@ def main():
         output_slice += '.svg'
         output_path += '.svg'
 
-    CadnanoSliceSvg(cndoc, output_slice, cs6=args.cs6)
-    CadnanoPathSvg(cndoc, output_path, cs6=args.cs6)
+    slice_svg = CadnanoSliceSvg(cndoc, output_slice, cs6=args.cs6)
+    path_svg = CadnanoPathSvg(cndoc, output_path, cs6=args.cs6)
+    dimensions = {'slice_svg_width': slice_svg.w,
+                  'slice_svg_height': slice_svg.h,
+                  'path_svg_width': path_svg.w,
+                  'path_svg_height': path_svg.h}
+    print(json.dumps(dimensions))
 # end def
 
 

@@ -13,6 +13,9 @@ from pysvg.shape import Circle, Path, Rect, Polygon, Line  # Polyline
 from pysvg.structure import Defs, G, Svg, Use
 from pysvg.text import Text
 
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPM
+
 import cadnano
 from cadnano.document import Document
 
@@ -123,7 +126,7 @@ class CadnanoSliceSvg(object):
     """
     Generate a Sliceview SVG for the given Cadnano document cn_doc.
     """
-    def __init__(self, cn_doc, output_path, cs6=False, scale=DEFAULT_SLICE_SCALE):
+    def __init__(self, cn_doc, output_path, thumbnail, cs6=False, scale=DEFAULT_SLICE_SCALE):
         super(CadnanoSliceSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
@@ -135,7 +138,10 @@ class CadnanoSliceSvg(object):
         self._slice_vh_fontsize = floor(2*self._slice_radius_scaled*0.75)
         self.g_slicevirtualhelices, self.w, self.h, transform = self.makeSliceVhGroup()
         self.g_slicevirtualhelixlabels = self.makeSliceVhLabelGroup(transform)
-        self.makeSliceSvg(self.w, self.h)
+        self.makeSliceSvg()
+
+        if thumbnail is not None:
+            self.makeThumbnail(thumbnail)
     # end def
 
     def makeSliceVhGroup(self) -> Tuple:
@@ -196,16 +202,27 @@ class CadnanoSliceSvg(object):
         return g
     # end def
 
-    def makeSliceSvg(self, width, height) -> Svg:
-        slice_svg = Svg(width=width, height=height)
-        viewbox = "0 0 %s %s" % (width, height)
+    def makeSliceSvg(self) -> Svg:
+        slice_svg = Svg(width=self.w, height=self.h)
+        viewbox = "0 0 %s %s" % (self.w, self.h)
         slice_svg.set_viewBox(viewbox)
         slice_svg.set_preserveAspectRatio("xMidYMid meet")
         slice_svg.setAttribute('id', "Cadnano_Slice")  # Main layer name
         slice_svg.addElement(self.g_slicevirtualhelices)  # bottom layer
         slice_svg.addElement(self.g_slicevirtualhelixlabels)  # top layer
         slice_svg.save(self.output_path)
-        return slice_svg
+
+    # end def
+
+    def makeThumbnail(self, size):
+        folder, basename = os.path.split(self.output_path)
+        name, ext = os.path.splitext(basename)
+        drawing = svg2rlg(self.output_path)
+        im = renderPM.drawToPIL(drawing)
+        # See https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.thumbnail
+        im.thumbnail((size, size))
+        png_file = os.path.join(folder, name + '.png')
+        im.save(png_file)
     # end def
 # end class
 
@@ -217,7 +234,7 @@ class CadnanoPathSvg(object):
     PATH_X_PADDING = 40
     PATH_Y_PADDING = 40
 
-    def __init__(self, cn_doc, output_path, cs6=False, scale=DEFAULT_PATH_SCALE):
+    def __init__(self, cn_doc, output_path, thumbnail, cs6=False, scale=DEFAULT_PATH_SCALE):
         super(CadnanoPathSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
@@ -242,9 +259,12 @@ class CadnanoPathSvg(object):
         if cn_doc.sequence_applied:
             self.g_pathsequences = self.makePathSequencesGroup()
 
-        self.w = round(self.PATH_X_PADDING*3 + cn_doc.max_vhelix_length*self._base_width, 3)
+        self.w = round(self.PATH_X_PADDING*2.5 + cn_doc.max_vhelix_length*self._base_width, 3)
         self.h = round(len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2, 3)
-        self.path_svg = self.makePathSvg(width=self.w, height=self.h)
+        self.path_svg = self.makePathSvg()
+
+        if thumbnail is not None:
+            self.makeThumbnail(thumbnail)
     # end def
 
     def mapIdnumsToYcoords(self) -> Dict:
@@ -568,13 +588,13 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
-    def makePathSvg(self, width, height) -> Svg:
+    def makePathSvg(self) -> Svg:
         """
         Returns the main `Svg` object for Path view.
 
         """
-        viewbox = "0 0 %s %s" % (width, height)
-        path_svg = Svg(width=width, height=height)
+        viewbox = "0 0 %s %s" % (self.w, self.h)
+        path_svg = Svg(width=self.w, height=self.h)
         path_svg.set_viewBox(viewbox)
         path_svg.set_preserveAspectRatio("xMinYMid meet")
         path_svg.setAttribute('id', "Cadnano_Path")  # Main layer name
@@ -590,19 +610,37 @@ class CadnanoPathSvg(object):
             path_svg.addElement(self.g_pathsequences)
         else:
             print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length, file=sys.stderr)
+
         path_svg.save(self.output_path)
 
         return path_svg
+    # end def
+
+    def makeThumbnail(self, size):
+        folder, basename = os.path.split(self.output_path)
+        name, ext = os.path.splitext(basename)
+        drawing = svg2rlg(self.output_path)
+        im = renderPM.drawToPIL(drawing)  # bg=0xe5e5e5, configPIL={'transparent': True}
+        # See https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.thumbnail
+        im.thumbnail((size, size))
+        png_file = os.path.join(folder, name + '.png')
+        im.save(png_file)
     # end def
 # end class
 
 
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--input', '-i', type=str, required=True, nargs=1, metavar='FILE', help='Cadnano JSON file')
-    parser.add_argument('--output', '-o', type=str, nargs='?', metavar='DIR', help='Output directory')
-    parser.add_argument('--seq', '-s', type=str, nargs='?', metavar='SEQUENCE.txt', help='Scaffold sequence file')
-    parser.add_argument('--cs6', action='store_true', help='Use font-family compatible with Adobe Illustrator CS6 instead of web browser')
+    parser.add_argument('--input', '-i', type=str, required=True, nargs=1, metavar='FILE',
+                        help='Cadnano JSON file')
+    parser.add_argument('--output', '-o', type=str, nargs='?', metavar='DIR',
+                        help='Output directory')
+    parser.add_argument('--seq', '-s', type=str, nargs='?', metavar='SEQUENCE.txt',
+                        help='Scaffold sequence file')
+    parser.add_argument('--cs6', action='store_true',
+                        help='Use font-family compatible with Adobe Illustrator CS6 instead of web browser')
+    parser.add_argument('--thumbnail', '-t', type=int, nargs='?', metavar='PIXELS', const=128,
+                        help='Output PNG thumbnail with max edgesize of PIXELS')
     args = parser.parse_args()
 
     if args.input is None:
@@ -644,8 +682,9 @@ def main():
         output_slice += '.svg'
         output_path += '.svg'
 
-    slice_svg = CadnanoSliceSvg(cndoc, output_slice, cs6=args.cs6)
-    path_svg = CadnanoPathSvg(cndoc, output_path, cs6=args.cs6)
+    print('thumb [{}]'.format(args.thumbnail))
+    slice_svg = CadnanoSliceSvg(cndoc, output_slice, args.thumbnail, cs6=args.cs6)
+    path_svg = CadnanoPathSvg(cndoc, output_path, args.thumbnail, cs6=args.cs6)
     dimensions = {'slice_svg_width': slice_svg.w,
                   'slice_svg_height': slice_svg.h,
                   'path_svg_width': path_svg.w,

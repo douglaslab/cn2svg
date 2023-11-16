@@ -2,6 +2,13 @@
 
 cn2svg a rewrite of the SVG export tool found in the original cadnano ([Svg.as](https://github.com/sdouglas/cadnano/blob/master/edu/harvard/med/cadnano/data/Svg.as)).
 
+## About
+
+Rendering Cadnano designs in SVG format can be useful for making figures and schematics. However, SVG support was very limited in Cadnano2 because it relied on the [QtSvgGenerator](https://doc.qt.io/qt-5/qsvggenerator.html) class to provide automatic conversion. The conversion did not retain element groups based on the Cadnano data structures, and most path strokes were scaled incorrectly.
+
+As part of developing the new Cadnano Toolkit, we've rewritten the original SVG exporter as a standalone Python script, `cn2svg`. It provides a few new features under the hood, such as hooks for dynamic path styling via unique element id attributes, and element instancing using the `defs` and `use` tags.
+
+
 ## Installation
 
 `pip3 install cn2svg`
@@ -47,12 +54,23 @@ cd cadnano2.5/
 python3 setup.py install
 ```
 
-## About
-
-Rendering Cadnano designs in SVG format can be useful for making figures and schematics. However, SVG support was very limited in Cadnano2 because it relied on the [QtSvgGenerator](https://doc.qt.io/qt-5/qsvggenerator.html) class to provide automatic conversion. The conversion did not retain element groups based on the Cadnano data structures, and most path strokes were scaled incorrectly.
-
-As part of developing the new Cadnano Toolkit, we've rewritten the original SVG exporter as a standalone Python script, `cn2svg`. It provides a few new features under the hood, such as hooks for dynamic path styling via unique element id attributes, and element instancing using the `defs` and `use` tags.
 
 ## Citing
 
 If you use `cn2svg`, please cite [doi.org/10.1093/nar/gkp436](https://doi.org/10.1093/nar/gkp436).
+
+
+## Development
+
+We use a pyproject.toml-based [build process](https://pip.pypa.io/en/stable/reference/build-system/pyproject-toml/) in pip. This workflow was tested with python 3.12 on macOS in November 2023.
+
+**Setup a dev environment (Mac or Linux)**
+
+* Create a virtualenv: `python3 -m venv ~/virtualenvs/cnsvg` 
+* Activate virtualenv: `source ~/virtualenvs/cnsvg/bin/activate`
+* Clone repo: `git clone git@github.com:douglaslab/cn2svg.git`
+* Change directory: `cd cn2svg`
+* Make desired code edits
+* Build and install in [editable mode](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e): `pip install -e .` 
+* Test: `autobreak -i cadnanofile.json`
+* Repeat previous 3 steps as needed

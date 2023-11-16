@@ -1,0 +1,36 @@
+[project]
+name = "cn2svg"
+version = "1.0.0"
+authors = [
+  {name = "Shawn Douglas", email = "shawn.douglas@ucsf.edu"},
+]
+description = "Standalone SVG exporter for Cadnano files."
+keywords = ["dna", "origami", "cadnano"]
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+requires-python = ">=3.8"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+]
+dependencies = [
+  'svglib',
+  'pysvg-py3 @ git+https://github.com/douglaslab/pysvg-py3',
+  'cadnano @ git+https://github.com/douglaslab/cadnano2.5.git'
+]
+
+[project.urls]  # populates "Project links" on pypi.org page.
+"Source" = "https://github.com/douglaslab/cn2svg"
+"Bug Reports" = "https://github.com/douglaslab/cn2svg/issues"
+
+[project.scripts]
+# The following provides a command-line executable called `autobreak`
+# which executes the function `main` from this package when invoked.
+cn2svg = "cn2svg:cn2svg.main"
+
+[build-system]
+requires = ["setuptools>=43.0.0", "wheel"]
+build-backend = "setuptools.build_meta"

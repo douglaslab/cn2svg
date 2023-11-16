@@ -66,11 +66,11 @@ We use a pyproject.toml-based [build process](https://pip.pypa.io/en/stable/refe
 
 **Setup a dev environment (Mac or Linux)**
 
-* Create a virtualenv: `python3 -m venv ~/virtualenvs/cnsvg` 
-* Activate virtualenv: `source ~/virtualenvs/cnsvg/bin/activate`
+* Create a virtualenv: `python3 -m venv ~/virtualenvs/cn2svgdev` 
+* Activate virtualenv: `source ~/virtualenvs/cn2svgdev/bin/activate`
 * Clone repo: `git clone git@github.com:douglaslab/cn2svg.git`
 * Change directory: `cd cn2svg`
 * Make desired code edits
 * Build and install in [editable mode](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e): `pip install -e .` 
-* Test: `autobreak -i cadnanofile.json`
+* Test: `cn2svg -i cadnanofile.json`
 * Repeat previous 3 steps as needed

@@ -17,7 +17,7 @@ As part of developing the new Cadnano Toolkit, we've rewritten the original SVG 
 
 `cn2svg -i cadnanofile.json -o outputdir`
 
-The output should include two separate files: `cadnanofile_slice.svg` and `cadnanofile_path.svg`.
+The output should include two separate files: `cadnanofile_ortho.svg` and `cadnanofile_path.svg`.
 
 ## Sequence support
 
@@ -35,7 +35,7 @@ The current workaround is to support the export of a custom SVG files that open 
 
 `cn2svg -i cadnanofile.json --cs6`
 
-Expected output: `cadnanofile_slice_cs6.svg` and `cadnanofile_path_cs6.svg`.
+Expected output: `cadnanofile_ortho_cs6.svg` and `cadnanofile_path_cs6.svg`.
 
 Path oligo sequences will not match the browser appearance in CS6. You can improve alignment by adjusting the font size and tracking.
 

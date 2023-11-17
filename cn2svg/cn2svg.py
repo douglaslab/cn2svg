@@ -18,7 +18,7 @@ from pysvg.text import Text
 import cadnano
 from cadnano.document import Document
 
-DEFAULT_SLICE_SCALE = 10
+DEFAULT_ORTHO_SCALE = 10
 DEFAULT_PATH_SCALE = 10
 
 
@@ -48,8 +48,8 @@ class CadnanoDocument(object):
         self.applySequenceToSameLengthOligos(sequence)
     # end def
 
-    def getSliceDimensions(self) -> Tuple:
-        return self.slice_width, self.slice_height
+    def getOrthoDimensions(self) -> Tuple:
+        return self.ortho_width, self.ortho_height
     # end def
 
     def applySequenceToSameLengthOligos(self, sequence) -> None:
@@ -121,35 +121,35 @@ class CadnanoDocument(object):
 # end class
 
 
-class CadnanoSliceSvg(object):
+class CadnanoOrthoSvg(object):
     """
-    Generate a Sliceview SVG for the given Cadnano document cn_doc.
+    Generate a Orthoview SVG for the given Cadnano document cn_doc.
     """
-    def __init__(self, cn_doc, output_path, thumbnail=None, cs6=False, scale=DEFAULT_SLICE_SCALE):
-        super(CadnanoSliceSvg, self).__init__()
+    def __init__(self, cn_doc, output_path, thumbnail=None, cs6=False, scale=DEFAULT_ORTHO_SCALE):
+        super(CadnanoOrthoSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
         self.useCS6font = cs6
         self.w = None
         self.h = None
         self._scale = scale
-        self._slice_radius_scaled = cn_doc.vh_radius*scale
-        self._slice_vh_fontsize = floor(2*self._slice_radius_scaled*0.75)
-        self.g_slicevirtualhelices, self.w, self.h, transform = self.makeSliceVhGroup()
-        self.g_slicevirtualhelixlabels = self.makeSliceVhLabelGroup(transform)
-        self.makeSliceSvg()
+        self._ortho_radius_scaled = cn_doc.vh_radius*scale
+        self._ortho_vh_fontsize = floor(2*self._ortho_radius_scaled*0.75)
+        self.g_orthovirtualhelices, self.w, self.h, transform = self.makeOrthoVhGroup()
+        self.g_orthovirtualhelixlabels = self.makeOrthoVhLabelGroup(transform)
+        self.makeOrthoSvg()
 
         # Disabled thumbnail support
         # if thumbnail is not None:
         #     self.makeThumbnail(thumbnail)
     # end def
 
-    def makeSliceVhGroup(self) -> Tuple:
+    def makeOrthoVhGroup(self) -> Tuple:
         """
-        Creates and returns a 'G' object for Slice Virtual Helices.
+        Creates and returns a 'G' object for Ortho Virtual Helices.
         """
-        _SLICE_SCALE = self._scale
-        vh_radius = self.cn_doc.vh_radius * _SLICE_SCALE
+        _ORTHO_SCALE = self._scale
+        vh_radius = self.cn_doc.vh_radius * _ORTHO_SCALE
         g = G()
         g.setAttribute('id', "VirtualHelices")
         minx = 99999
@@ -158,8 +158,8 @@ class CadnanoSliceSvg(object):
         maxy = -99999
         for id_num in self.cn_doc.vh_order[::-1]:
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
-            x = vh_x * _SLICE_SCALE  # + self.cn_doc.x_offset
-            y = -vh_y * _SLICE_SCALE  # + self.cn_doc.y_offset
+            x = vh_x * _ORTHO_SCALE  # + self.cn_doc.x_offset
+            y = -vh_y * _ORTHO_SCALE  # + self.cn_doc.y_offset
             minx = min(minx, x)
             miny = min(miny, y)
             maxx = max(maxx, x)
@@ -178,14 +178,14 @@ class CadnanoSliceSvg(object):
         return g, width, height, transform
     # end def
 
-    def makeSliceVhLabelGroup(self, transform) -> G:
+    def makeOrthoVhLabelGroup(self, transform) -> G:
         """
-        Creates and returns a 'G' object for Slice VirtualHelix Labels.
+        Creates and returns a 'G' object for Ortho VirtualHelix Labels.
         """
-        _SLICE_SCALE = self._scale
+        _ORTHO_SCALE = self._scale
         g = G()
         g.setAttribute('id', "VirtualHelixLabels")
-        g.setAttribute('font-size', "%s" % self._slice_vh_fontsize)
+        g.setAttribute('font-size', "%s" % self._ortho_vh_fontsize)
         if self.useCS6font:
             g.setAttribute("font-family", "'SourceSansPro-Regular'")
         else:
@@ -195,22 +195,22 @@ class CadnanoSliceSvg(object):
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
             x = vh_x  # + self.cn_doc.x_offset
             y = -vh_y + self.cn_doc.vh_radius/2.
-            t = Text('%s' % id_num, x*_SLICE_SCALE, y*_SLICE_SCALE - 1)
+            t = Text('%s' % id_num, x*_ORTHO_SCALE, y*_ORTHO_SCALE - 1)
             t.setAttribute('id', "label_"+self.cn_doc.vh_props['name'][id_num])
             g.addElement(t)
         g.set_transform(transform)
         return g
     # end def
 
-    def makeSliceSvg(self) -> Svg:
-        slice_svg = Svg(width=self.w, height=self.h)
+    def makeOrthoSvg(self) -> Svg:
+        ortho_svg = Svg(width=self.w, height=self.h)
         viewbox = "0 0 %s %s" % (self.w, self.h)
-        slice_svg.set_viewBox(viewbox)
-        slice_svg.set_preserveAspectRatio("xMidYMid meet")
-        slice_svg.setAttribute('id', "Cadnano_Slice")  # Main layer name
-        slice_svg.addElement(self.g_slicevirtualhelices)  # bottom layer
-        slice_svg.addElement(self.g_slicevirtualhelixlabels)  # top layer
-        slice_svg.save(self.output_path)
+        ortho_svg.set_viewBox(viewbox)
+        ortho_svg.set_preserveAspectRatio("xMidYMid meet")
+        ortho_svg.setAttribute('id', "Cadnano_Ortho")  # Main layer name
+        ortho_svg.addElement(self.g_orthovirtualhelices)  # bottom layer
+        ortho_svg.addElement(self.g_orthovirtualhelixlabels)  # top layer
+        ortho_svg.save(self.output_path)
 
     # end def
 
@@ -693,27 +693,27 @@ def run(notebook_session=False, args=None):
     if output_directory:
         if not os.path.exists(output_directory):
             os.makedirs(output_directory, exist_ok=True)
-        output_slice = os.path.join(output_directory, '%s_slice' % basename)
+        output_ortho = os.path.join(output_directory, '%s_ortho' % basename)
         output_path = os.path.join(output_directory, '%s_path' % basename)
     else:
-        output_slice = '%s_slice' % base_path
+        output_ortho = '%s_ortho' % base_path
         output_path = '%s_path' % base_path
 
     print(output_directory)
 
     # File extension
     # if args.cs6:
-    #     output_slice += '_cs6.svg'
+    #     output_ortho += '_cs6.svg'
     #     output_path += '_cs6.svg'
     # else:
-    output_slice += '.svg'
+    output_ortho += '.svg'
     output_path += '.svg'
 
     # print('thumb [{}]'.format(args.thumbnail))
-    slice_svg = CadnanoSliceSvg(cndoc, output_slice)
+    ortho_svg = CadnanoOrthoSvg(cndoc, output_ortho)
     path_svg = CadnanoPathSvg(cndoc, output_path)
-    dimensions = {'slice_svg_width': slice_svg.w,
-                  'slice_svg_height': slice_svg.h,
+    dimensions = {'ortho_svg_width': ortho_svg.w,
+                  'ortho_svg_height': ortho_svg.h,
                   'path_svg_width': path_svg.w,
                   'path_svg_height': path_svg.h}
     # print(json.dumps(dimensions))

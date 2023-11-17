@@ -61,7 +61,7 @@ class CadnanoDocument(object):
             if oligo_len == seq_length:
                 s = oligo.strand5p()
                 fwd = 'fwd' if s.isForward() else 'rev'
-                print('Applying sequence at %s[%s] (%s strand)' % (s.idNum(), s.idx5Prime(), fwd))
+                # print('Applying sequence at %s[%s] (%s strand)' % (s.idNum(), s.idx5Prime(), fwd))
                 oligo.applySequence(sequence, use_undostack=False)
                 self.sequence_applied = True
 
@@ -643,8 +643,7 @@ class DefaultArgs(argparse.Namespace):
     # thumbpixels = 128  # max edge dimension of thumbnail, in pixels
 
 
-def parse_args_from_shell():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+def parse_args_from_shell(parser):
     parser.add_argument('--input', '-i', type=str, required=True, nargs=1, metavar='FILE',
                         help='Cadnano JSON file')
     parser.add_argument('--output', '-o', type=str, nargs='?', metavar='DIR',
@@ -658,22 +657,21 @@ def parse_args_from_shell():
     return parser.parse_args()
 
 
-def run(notebook_session, uploaded=None):
-    if notebook_session:
-        args = DefaultArgs()
-        args.input = list(uploaded.keys())[0]
+def run(notebook_session=False, args=None):
+    if args is None:
+        # Get arguments from command line or notebook environment
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        args = DefaultArgs() if notebook_session else parse_args_from_shell(parser)
+        if args.input is None:
+            parser.print_help()
+            sys.exit('Input file not specified')
+        design = args.input[0]
+        if not design.endswith('.json'):
+            parser.print_help()
+            sys.exit('Input should be JSON file')
     else:
-        args = parse_args_from_shell()
-
-
-    if args.input is None:
-        parser.print_help()
-        sys.exit('Input file not specified')
-
-    design = args.input[0]
-    if not design.endswith('.json'):
-        parser.print_help()
-        sys.exit('Input should be JSON file')
+        # Assume args included in run function call
+        design = args.input
 
     output_directory = args.output
 
@@ -698,16 +696,18 @@ def run(notebook_session, uploaded=None):
         output_slice = os.path.join(output_directory, '%s_slice' % basename)
         output_path = os.path.join(output_directory, '%s_path' % basename)
     else:
-        output_slice = '%s_slice.svg' % base_path
-        output_path = '%s_path.svg' % base_path
+        output_slice = '%s_slice' % base_path
+        output_path = '%s_path' % base_path
+
+    print(output_directory)
 
     # File extension
     # if args.cs6:
     #     output_slice += '_cs6.svg'
     #     output_path += '_cs6.svg'
     # else:
-    #     output_slice += '.svg'
-    #     output_path += '.svg'
+    output_slice += '.svg'
+    output_path += '.svg'
 
     # print('thumb [{}]'.format(args.thumbnail))
     slice_svg = CadnanoSliceSvg(cndoc, output_slice)
@@ -726,4 +726,4 @@ def main():
     except NameError:
         is_notebook_session = False
 
-    run(is_notebook_session)
+    run(notebook_session=is_notebook_session)

@@ -1,6 +1,6 @@
 [project]
 name = "cn2svg"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   {name = "Shawn Douglas", email = "shawn.douglas@ucsf.edu"},
 ]
@@ -27,7 +27,7 @@ dependencies = [
 "Bug Reports" = "https://github.com/douglaslab/cn2svg/issues"
 
 [project.scripts]
-# The following provides a command-line executable called `autobreak`
+# The following provides a command-line executable called `cn2svg`
 # which executes the function `main` from this package when invoked.
 cn2svg = "cn2svg:cn2svg.main"
 

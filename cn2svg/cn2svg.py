@@ -699,8 +699,6 @@ def run(notebook_session=False, args=None):
         output_ortho = '%s_ortho' % base_path
         output_path = '%s_path' % base_path
 
-    print(output_directory)
-
     # File extension
     # if args.cs6:
     #     output_ortho += '_cs6.svg'

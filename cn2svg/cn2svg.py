@@ -128,11 +128,10 @@ class CadnanoOrthoSvg(object):
     """
     Generate a Orthoview SVG for the given Cadnano document cn_doc.
     """
-    def __init__(self, cn_doc, output_path, thumbnail=None, cs6=False, scale=DEFAULT_ORTHO_SCALE):
+    def __init__(self, cn_doc, output_path, thumbnail=None, scale=DEFAULT_ORTHO_SCALE):
         super(CadnanoOrthoSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
-        self.useCS6font = cs6
         self.w = None
         self.h = None
         self._scale = scale
@@ -189,10 +188,7 @@ class CadnanoOrthoSvg(object):
         g = G()
         g.setAttribute('id', "VirtualHelixLabels")
         g.setAttribute('font-size', "%s" % self._ortho_vh_fontsize)
-        if self.useCS6font:
-            g.setAttribute("font-family", "'SourceSansPro-Regular'")
-        else:
-            g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
+        g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
         g.setAttribute("text-anchor", "middle")
         for id_num in self.cn_doc.vh_order[::-1]:
             vh_x, vh_y = self.cn_doc.vh_origins[id_num]
@@ -238,12 +234,11 @@ class CadnanoPathSvg(object):
     PATH_X_PADDING = 40
     PATH_Y_PADDING = 40
 
-    def __init__(self, cn_doc, output_path, heatmap, thumbnail=None, cs6=False, scale=DEFAULT_PATH_SCALE):
+    def __init__(self, cn_doc, output_path, heatmap, thumbnail=None, scale=DEFAULT_PATH_SCALE):
         super(CadnanoPathSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
         self._heatmap = heatmap
-        self.useCS6font = cs6
         self.w = None
         self.h = None
         self._scale = scale
@@ -310,10 +305,7 @@ class CadnanoPathSvg(object):
         g = G()
         g.setAttribute('id', "VirtualHelixLabels")
         g.setAttribute('font-size', "%s" % self._path_vh_fontsize)
-        if self.useCS6font:
-            g.setAttribute("font-family", "'SourceSansPro-Regular'")
-        else:
-            g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
+        g.setAttribute("font-family", "'Source Sans Pro', sans-serif")
         g.setAttribute("text-anchor", "middle")
         for i in range(len(self.cn_doc.vh_order)):
             id_num = self.cn_doc.vh_order[i]
@@ -717,7 +709,6 @@ class DefaultArgs(argparse.Namespace):
     output     = None  # Output directory
     seq        = None  # Scaffold sequence file
     heatmap    = False # Hide staple crossover quad curves
-    # cs6        = False # Use font-family compatible with Adobe Illustrator CS6 instead of web browser
     # thumbnail  = False # Output PNG thumbnail 
     # thumbpixels = 128  # max edge dimension of thumbnail, in pixels
 
@@ -731,8 +722,6 @@ def parse_args_from_shell(parser):
                         help='Scaffold sequence file')
     parser.add_argument('--heatmap', '-H', action='store_true',
                         help='Render compact heatmap-friendly style with no staple xovers.')
-    # parser.add_argument('--cs6', action='store_true',
-    #                     help='Use font-family compatible with Adobe Illustrator CS6 instead of web browser')
     # parser.add_argument('--thumbnail', '-t', type=int, nargs='?', metavar='PIXELS', const=128,
     #                     help='Output PNG thumbnail with max edgesize of PIXELS')
     return parser.parse_args()
@@ -780,11 +769,6 @@ def run(notebook_session=False, args=None):
         output_ortho = '%s_ortho' % base_path
         output_path = '%s_path' % base_path
 
-    # File extension
-    # if args.cs6:
-    #     output_ortho += '_cs6.svg'
-    #     output_path += '_cs6.svg'
-    # else:
     output_ortho += '.svg'
     output_path += '.svg'
 

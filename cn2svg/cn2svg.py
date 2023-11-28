@@ -71,9 +71,12 @@ class CadnanoDocument(object):
             color = oligo.getColor()
             strands = []
             strand5p = oligo.strand5p()
+            is_staple = None 
             for s in strand5p.generator3pStrand():
                 strands.append([s.idNum(), s.idx5Prime(), s.idx3Prime(), s.isForward(), s.sequence()])
-            oligo_list.append([color, oligo.isCircular(), strands])
+                if is_staple is None:
+                    is_staple = not s.isForward() if (s.idNum() % 2 == 0) else s.isForward()
+            oligo_list.append([is_staple, color, oligo.isCircular(), strands])
         return oligo_list
     # end def
 
@@ -235,17 +238,18 @@ class CadnanoPathSvg(object):
     PATH_X_PADDING = 40
     PATH_Y_PADDING = 40
 
-    def __init__(self, cn_doc, output_path, thumbnail=None, cs6=False, scale=DEFAULT_PATH_SCALE):
+    def __init__(self, cn_doc, output_path, heatmap, thumbnail=None, cs6=False, scale=DEFAULT_PATH_SCALE):
         super(CadnanoPathSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
+        self._heatmap = heatmap
         self.useCS6font = cs6
         self.w = None
         self.h = None
         self._scale = scale
         self._path_radius_scaled = cn_doc.vh_radius*scale
         self._path_vh_fontsize = floor(2*self._path_radius_scaled*0.75)
-        self._path_vh_margin = self._path_radius_scaled*5
+        self._path_vh_margin = self._path_radius_scaled*(3 if heatmap else 5)
         self._base_width = self._base_height = self._path_radius_scaled
 
         self.defs = self.makePathDefs()
@@ -254,6 +258,7 @@ class CadnanoPathSvg(object):
         self.g_pathvirtualhelixlabels = self.makePathVhLabelGroup()
         self.g_pathgridlines = self.makePathGridlinesGroup()
         self.g_patholigos = self.makePathOligosGroup()
+        self.g_pathstaplexos = self.makePathStapleCrossoversGroup()
         self.g_pathendpoints = self.makePathEndpointsGroup()
         self.g_pathinsertions = self.makePathInsertionsGroup()
         self.g_pathskips = self.makePathSkipsGroup()
@@ -341,6 +346,7 @@ class CadnanoPathSvg(object):
     # end def
 
     def makePathOligosGroup(self) -> G:
+        heatmap = self._heatmap
         id_coords = self.mapIdnumsToYcoords()
         oligo_list = self.cn_doc.getOligoList()
         _BW = self._base_width
@@ -349,14 +355,15 @@ class CadnanoPathSvg(object):
         g = G()
         g.setAttribute('id', "Oligos")
         i = 0
-        for color, is_circular, strands in oligo_list:
+        for is_staple, color, is_circular, strands in oligo_list:
             prev_id, prev5, prev3, prevX, prevY = None, None, None, 0, 0
             path_lines = []
             if is_circular:
                 strands.append(strands[0])
             for id_num, idx5, idx3, isfwd, _ in strands:
                 x = _pX + idx5*_BW
-                if idx5 < idx3:  # top strand
+                is_top_strand = idx5 < idx3
+                if is_top_strand:  # top strand
                     y = id_coords[id_num] - _BH/2
                 else:
                     y = id_coords[id_num] + _BH/2
@@ -369,13 +376,22 @@ class CadnanoPathSvg(object):
                     else:
                         x1 = x - abs(y-prevY)*0.03
                     y1 = (y+prevY)/2
-                    path_lines.append("Q %s %s, %s %s" % (x1, y1, x, y))
+                    if heatmap and is_staple:
+                        dy = _BH/2 if idx5 > idx3 else -_BH/2
+                        dy1 = _BH/2 if prev5 > prev3 else -_BH/2
+                        # path_lines.append("v %s" % (dy1))
+                        # path_lines.append("M %s, %s" % (x, y))
+                        # path_lines.append("v %s" % (dy))
+                        path_lines.append("M %s, %s" % (x, y))
+                    else:
+                        path_lines.append("Q %s %s, %s %s" % (x1, y1, x, y))
                     path_lines.append("h %s" % dx)
                 else:
                     path_lines.append("M %s, %s h %s" % (x, y, dx))
                 prev_id, prev5, prev3, prevX, prevY = id_num, idx5, idx3, x, y
             p = Path(" ".join(path_lines))
-            oligo_style = 'fill:none; stroke:%s; stroke-width:2' % color
+            sw = 14 if (heatmap and is_staple) else 2
+            oligo_style = 'fill:none; stroke:%s; stroke-width:%s' % (color,sw)
             p.set_style(oligo_style)
             p.setAttribute('id', "oligo_%s" % i)
             p.setAttribute("stroke-linejoin", "round")
@@ -384,7 +400,58 @@ class CadnanoPathSvg(object):
         return g
     # end def
 
+    def makePathStapleCrossoversGroup(self) -> G:
+        heatmap = self._heatmap
+        id_coords = self.mapIdnumsToYcoords()
+        oligo_list = self.cn_doc.getOligoList()
+        _BW = self._base_width
+        _BH = self._base_height
+        _pX = self.PATH_X_PADDING + self._path_radius_scaled*3 + _BW/2
+        g = G()
+        g.setAttribute('id', "OligoCrossovers")
+        i = 0
+        for is_staple, color, is_circular, strands in oligo_list:
+            prev_id, prev5, prev3, prevX, prevY = None, None, None, 0, 0
+            path_lines = []
+            if is_circular:
+                strands.append(strands[0])
+            for id_num, idx5, idx3, isfwd, _ in strands:
+                x = _pX + idx5*_BW
+                is_top_strand = idx5 < idx3
+                if is_top_strand:  # top strand
+                    y = id_coords[id_num] - _BH/2
+                else:
+                    y = id_coords[id_num] + _BH/2
+                dx = (idx3-idx5)*_BW
+
+                if prev_id is not None and id_num != prev_id:
+                    # c dx1 dy1, dx2 dy2, dx dy
+                    if isfwd:
+                        x1 = x + abs(y-prevY)*0.03
+                    else:
+                        x1 = x - abs(y-prevY)*0.03
+                    y1 = (y+prevY)/2
+                    # path_lines.append("M %s, %s" % (x1,y1))
+                    path_lines.append("Q %s %s, %s %s" % (x1, y1, x, y))
+                    path_lines.append("M %s, %s" % (x+dx,y))
+                else:
+                    path_lines.append("M %s, %s" % (x+dx, y))
+                
+                prev_id, prev5, prev3, prevX, prevY = id_num, idx5, idx3, x, y
+            p = Path(" ".join(path_lines))
+            # sw = 2 # if (heatmap and is_staple) else 2
+            oligo_style = 'fill:none; stroke:%s; stroke-width:2' % (color)
+            p.set_style(oligo_style)
+            p.setAttribute('id', "oligo_stapxo_%s" % i)
+            p.setAttribute("stroke-linejoin", "round")
+            i += 1
+            g.addElement(p)
+        return g
+    # end def
+
+
     def makePathEndpointsGroup(self) -> G:
+        heatmap = self._heatmap
         _BW = self._base_width
         _BH = self._base_height
         _pX = self.PATH_X_PADDING + self._path_radius_scaled*3
@@ -394,6 +461,10 @@ class CadnanoPathSvg(object):
         g.setAttribute('id', "Endpoints")
         i = 0
         for color, idnum5p, idx5p, isfwd5p in ends5p:
+            is_staple = not isfwd5p if (idnum5p % 2 == 0) else isfwd5p
+            if heatmap and is_staple:
+                continue
+
             if isfwd5p:
                 x = _pX + idx5p*_BW + _BW*.25
                 y = id_coords[idnum5p] - _BH + _BH*.05
@@ -408,6 +479,10 @@ class CadnanoPathSvg(object):
             g.addElement(r)
         j = 0
         for color, idnum3p, idx3p, isfwd3p in ends3p:
+            is_staple = not isfwd3p if (idnum3p % 2 == 0) else isfwd3p
+            if heatmap and is_staple:
+                continue
+
             if isfwd3p:
                 x = _pX + idx3p*_BW
                 y = id_coords[idnum3p] - _BH
@@ -446,7 +521,7 @@ class CadnanoPathSvg(object):
         g.setAttribute('font-family', 'Monaco')
 
         i = 0
-        for color, is_circular, strands in oligo_list:
+        for is_staple, color, is_circular, strands in oligo_list:
             g_oligo = G()
             g_oligo.setAttribute('id', "oligo_seq_%s" % i)
             i += 1
@@ -603,13 +678,16 @@ class CadnanoPathSvg(object):
         path_svg.set_preserveAspectRatio("xMinYMid meet")
         path_svg.setAttribute('id', "Cadnano_Path")  # Main layer name
         path_svg.addElement(self.defs)
-        path_svg.addElement(self.g_pathgridlines)  # bottom layer
+        if not self._heatmap:
+            path_svg.addElement(self.g_pathgridlines)  # bottom layer
         path_svg.addElement(self.g_patholigos)
+        path_svg.addElement(self.g_pathstaplexos)
+        # if not self._heatmap:
         path_svg.addElement(self.g_pathendpoints)
         path_svg.addElement(self.g_pathvirtualhelices)
-        path_svg.addElement(self.g_pathvirtualhelixlabels)  # top layer
+        path_svg.addElement(self.g_pathvirtualhelixlabels)
         path_svg.addElement(self.g_pathinsertions)
-        path_svg.addElement(self.g_pathskips)
+        path_svg.addElement(self.g_pathskips)  # top layer
         if self.cn_doc.sequence_applied:
             path_svg.addElement(self.g_pathsequences)
         else:
@@ -638,6 +716,7 @@ class DefaultArgs(argparse.Namespace):
     input      = None  # Cadnano json file
     output     = None  # Output directory
     seq        = None  # Scaffold sequence file
+    heatmap    = False # Hide staple crossover quad curves
     # cs6        = False # Use font-family compatible with Adobe Illustrator CS6 instead of web browser
     # thumbnail  = False # Output PNG thumbnail 
     # thumbpixels = 128  # max edge dimension of thumbnail, in pixels
@@ -650,6 +729,8 @@ def parse_args_from_shell(parser):
                         help='Output directory')
     parser.add_argument('--seq', '-s', type=str, nargs='?', metavar='SEQUENCE.txt',
                         help='Scaffold sequence file')
+    parser.add_argument('--heatmap', '-H', action='store_true',
+                        help='Render compact heatmap-friendly style with no staple xovers.')
     # parser.add_argument('--cs6', action='store_true',
     #                     help='Use font-family compatible with Adobe Illustrator CS6 instead of web browser')
     # parser.add_argument('--thumbnail', '-t', type=int, nargs='?', metavar='PIXELS', const=128,
@@ -709,7 +790,7 @@ def run(notebook_session=False, args=None):
 
     # print('thumb [{}]'.format(args.thumbnail))
     ortho_svg = CadnanoOrthoSvg(cndoc, output_ortho)
-    path_svg = CadnanoPathSvg(cndoc, output_path)
+    path_svg = CadnanoPathSvg(cndoc, output_path, heatmap=args.heatmap)
     dimensions = {'ortho_svg_width': ortho_svg.w,
                   'ortho_svg_height': ortho_svg.h,
                   'path_svg_width': path_svg.w,

@@ -1,6 +1,6 @@
 [project]
 name = "cn2svg"
-version = "1.0.1"
+version = "1.0.2"
 authors = [
   {name = "Shawn Douglas", email = "shawn.douglas@ucsf.edu"},
 ]

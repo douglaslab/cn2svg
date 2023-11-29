@@ -11,10 +11,6 @@ from pysvg.shape import Circle, Path, Rect, Polygon, Line  # Polyline
 from pysvg.structure import Defs, G, Svg, Use
 from pysvg.text import Text
 
-# Disabled thumbnail support due to renderPM error on m1 mac
-# from svglib.svglib import svg2rlg
-# from reportlab.graphics import renderPM
-
 import cadnano
 from cadnano.document import Document
 
@@ -128,7 +124,7 @@ class CadnanoOrthoSvg(object):
     """
     Generate a Orthoview SVG for the given Cadnano document cn_doc.
     """
-    def __init__(self, cn_doc, output_path, thumbnail=None, scale=DEFAULT_ORTHO_SCALE):
+    def __init__(self, cn_doc, output_path, scale=DEFAULT_ORTHO_SCALE):
         super(CadnanoOrthoSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
@@ -140,10 +136,6 @@ class CadnanoOrthoSvg(object):
         self.g_orthovirtualhelices, self.w, self.h, transform = self.makeOrthoVhGroup()
         self.g_orthovirtualhelixlabels = self.makeOrthoVhLabelGroup(transform)
         self.makeOrthoSvg()
-
-        # Disabled thumbnail support
-        # if thumbnail is not None:
-        #     self.makeThumbnail(thumbnail)
     # end def
 
     def makeOrthoVhGroup(self) -> Tuple:
@@ -210,20 +202,7 @@ class CadnanoOrthoSvg(object):
         ortho_svg.addElement(self.g_orthovirtualhelices)  # bottom layer
         ortho_svg.addElement(self.g_orthovirtualhelixlabels)  # top layer
         ortho_svg.save(self.output_path)
-
     # end def
-
-    # Disabled thumbnail support
-    # def makeThumbnail(self, size):
-    #     folder, basename = os.path.split(self.output_path)
-    #     name, ext = os.path.splitext(basename)
-    #     drawing = svg2rlg(self.output_path)
-    #     im = renderPM.drawToPIL(drawing)
-    #     # See https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.thumbnail
-    #     im.thumbnail((size, size))
-    #     png_file = os.path.join(folder, name + '.png')
-    #     im.save(png_file)
-    # # end def
 # end class
 
 
@@ -234,7 +213,7 @@ class CadnanoPathSvg(object):
     PATH_X_PADDING = 40
     PATH_Y_PADDING = 40
 
-    def __init__(self, cn_doc, output_path, heatmap, thumbnail=None, scale=DEFAULT_PATH_SCALE):
+    def __init__(self, cn_doc, output_path, heatmap, scale=DEFAULT_PATH_SCALE):
         super(CadnanoPathSvg, self).__init__()
         self.cn_doc = cn_doc
         self.output_path = output_path
@@ -263,10 +242,6 @@ class CadnanoPathSvg(object):
         self.w = round(self.PATH_X_PADDING*2.5 + cn_doc.max_vhelix_length*self._base_width, 3)
         self.h = round(len(cn_doc.vh_order)*self._path_vh_margin + self.PATH_Y_PADDING/2, 3)
         self.path_svg = self.makePathSvg()
-
-        # Disabled thumbnail support
-        # if thumbnail is not None:
-        #     self.makeThumbnail(thumbnail)
     # end def
 
     def mapIdnumsToYcoords(self) -> Dict:
@@ -371,9 +346,6 @@ class CadnanoPathSvg(object):
                     if heatmap and is_staple:
                         dy = _BH/2 if idx5 > idx3 else -_BH/2
                         dy1 = _BH/2 if prev5 > prev3 else -_BH/2
-                        # path_lines.append("v %s" % (dy1))
-                        # path_lines.append("M %s, %s" % (x, y))
-                        # path_lines.append("v %s" % (dy))
                         path_lines.append("M %s, %s" % (x, y))
                     else:
                         path_lines.append("Q %s %s, %s %s" % (x1, y1, x, y))
@@ -454,8 +426,9 @@ class CadnanoPathSvg(object):
         i = 0
         for color, idnum5p, idx5p, isfwd5p in ends5p:
             is_staple = not isfwd5p if (idnum5p % 2 == 0) else isfwd5p
+            # Disable staple endpoints for heatmap
             if heatmap and is_staple:
-                continue
+                continue  
 
             if isfwd5p:
                 x = _pX + idx5p*_BW + _BW*.25
@@ -472,8 +445,8 @@ class CadnanoPathSvg(object):
         j = 0
         for color, idnum3p, idx3p, isfwd3p in ends3p:
             is_staple = not isfwd3p if (idnum3p % 2 == 0) else isfwd3p
-            if heatmap and is_staple:
-                continue
+            # if heatmap and is_staple:
+            #     continue
 
             if isfwd3p:
                 x = _pX + idx3p*_BW
@@ -680,7 +653,7 @@ class CadnanoPathSvg(object):
         path_svg.addElement(self.g_pathvirtualhelixlabels)
         path_svg.addElement(self.g_pathinsertions)
         path_svg.addElement(self.g_pathskips)  # top layer
-        if self.cn_doc.sequence_applied:
+        if not self._heatmap and self.cn_doc.sequence_applied:
             path_svg.addElement(self.g_pathsequences)
         else:
             print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length, file=sys.stderr)
@@ -689,18 +662,6 @@ class CadnanoPathSvg(object):
 
         return path_svg
     # end def
-
-    # Disabled thumbnail support
-    # def makeThumbnail(self, size):
-    #     folder, basename = os.path.split(self.output_path)
-    #     name, ext = os.path.splitext(basename)
-    #     drawing = svg2rlg(self.output_path)
-    #     im = renderPM.drawToPIL(drawing)  # bg=0xe5e5e5, configPIL={'transparent': True}
-    #     # See https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.thumbnail
-    #     im.thumbnail((size, size))
-    #     png_file = os.path.join(folder, name + '.png')
-    #     im.save(png_file)
-    # # end def
 # end class
 
 
@@ -709,8 +670,6 @@ class DefaultArgs(argparse.Namespace):
     output     = None  # Output directory
     seq        = None  # Scaffold sequence file
     heatmap    = False # Hide staple crossover quad curves
-    # thumbnail  = False # Output PNG thumbnail 
-    # thumbpixels = 128  # max edge dimension of thumbnail, in pixels
 
 
 def parse_args_from_shell(parser):
@@ -722,8 +681,6 @@ def parse_args_from_shell(parser):
                         help='Scaffold sequence file')
     parser.add_argument('--heatmap', '-H', action='store_true',
                         help='Render compact heatmap-friendly style with no staple xovers.')
-    # parser.add_argument('--thumbnail', '-t', type=int, nargs='?', metavar='PIXELS', const=128,
-    #                     help='Output PNG thumbnail with max edgesize of PIXELS')
     return parser.parse_args()
 
 
@@ -772,7 +729,6 @@ def run(notebook_session=False, args=None):
     output_ortho += '.svg'
     output_path += '.svg'
 
-    # print('thumb [{}]'.format(args.thumbnail))
     ortho_svg = CadnanoOrthoSvg(cndoc, output_ortho)
     path_svg = CadnanoPathSvg(cndoc, output_path, heatmap=args.heatmap)
     dimensions = {'ortho_svg_width': ortho_svg.w,
@@ -780,7 +736,6 @@ def run(notebook_session=False, args=None):
                   'path_svg_width': path_svg.w,
                   'path_svg_height': path_svg.h}
     # print(json.dumps(dimensions))
-
 
 def main():
     try:

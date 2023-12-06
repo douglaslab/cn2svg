@@ -706,8 +706,9 @@ def run(is_notebook_session=False, args=None):
         valid = 'ACTGactg'
         with open(args.seq) as seqfile:
             sequence = ''.join(seqfile.read().split())
-            if all(s in valid for s in sequence) and not is_notebook_session:
-                print('Found valid sequence file, %s bases' % len(sequence), file=sys.stderr)
+            if all(s in valid for s in sequence):
+                if not is_notebook_session:
+                    print('Found valid sequence file, %s bases' % len(sequence), file=sys.stderr)
             else:
                 sys.exit('Error: %s contains non-[ATCGactg] character(s)' % args.seq)
 

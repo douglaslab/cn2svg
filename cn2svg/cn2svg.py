@@ -29,8 +29,7 @@ class CadnanoDocument(object):
 
         app = cadnano.app()
         doc = app.document = Document()
-        with redirect_stdout(sys.stderr):
-            doc.readFile(cnjsonpath)
+        doc.readFile(cnjsonpath)
         self.part = part = doc.activePart()
         self.part_props = part_props = part.getModelProperties().copy()
         self.vh_order = part_props['virtual_helix_order']
@@ -655,8 +654,8 @@ class CadnanoPathSvg(object):
         path_svg.addElement(self.g_pathskips)  # top layer
         if not self._heatmap and self.cn_doc.sequence_applied:
             path_svg.addElement(self.g_pathsequences)
-        else:
-            print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length, file=sys.stderr)
+        # else:
+        #     print('No sequences were applied. Max oligo length: %s' % self.cn_doc.max_oligo_length, file=sys.stderr)
 
         path_svg.save(self.output_path)
 
@@ -684,11 +683,11 @@ def parse_args_from_shell(parser):
     return parser.parse_args()
 
 
-def run(notebook_session=False, args=None):
+def run(is_notebook_session=False, args=None):
     if args is None:
         # Get arguments from command line or notebook environment
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        args = DefaultArgs() if notebook_session else parse_args_from_shell(parser)
+        args = DefaultArgs() if is_notebook_session else parse_args_from_shell(parser)
         if args.input is None:
             parser.print_help()
             sys.exit('Input file not specified')
@@ -707,7 +706,7 @@ def run(notebook_session=False, args=None):
         valid = 'ACTGactg'
         with open(args.seq) as seqfile:
             sequence = ''.join(seqfile.read().split())
-            if all(s in valid for s in sequence):
+            if all(s in valid for s in sequence) and not is_notebook_session:
                 print('Found valid sequence file, %s bases' % len(sequence), file=sys.stderr)
             else:
                 sys.exit('Error: %s contains non-[ATCGactg] character(s)' % args.seq)
@@ -744,4 +743,4 @@ def main():
     except NameError:
         is_notebook_session = False
 
-    run(notebook_session=is_notebook_session)
+    run(is_notebook_session=is_notebook_session)
